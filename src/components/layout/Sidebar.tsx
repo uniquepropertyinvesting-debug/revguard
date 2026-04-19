@@ -52,7 +52,6 @@ const NAV_GROUPS_BASE = [
   {
     label: 'CUSTOMERS & PLATFORM',
     items: [
-      { id: 'customers', label: 'Customers', icon: '👥' },
       { id: 'ai-assistant', label: 'AI Revenue Assistant', icon: '🤖', badge: 'AI' },
       { id: 'integrations', label: 'Integrations', icon: '🔗' },
       { id: 'data-protection', label: 'Data Protection', icon: '🔒' },
@@ -62,7 +61,6 @@ const NAV_GROUPS_BASE = [
   {
     label: 'ACCOUNT',
     items: [
-      { id: 'how-it-works', label: 'How It Works', icon: '📖' },
       { id: 'pricing', label: 'Plans & Pricing', icon: '💎', badge: 'NEW' },
     ]
   }

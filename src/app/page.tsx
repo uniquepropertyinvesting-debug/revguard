@@ -16,9 +16,7 @@ import RevenueLossIntel from '@/components/dashboard/RevenueLossIntel'
 import ChurnIntervention from '@/components/dashboard/ChurnIntervention'
 import AlertSettings from '@/components/dashboard/AlertSettings'
 import AutomatedDunning from '@/components/dashboard/AutomatedDunning'
-import Customers from '@/components/dashboard/Customers'
 import Pricing from '@/components/dashboard/Pricing'
-import HowItWorks from '@/components/dashboard/HowItWorks'
 import Sidebar from '@/components/layout/Sidebar'
 import TopBar from '@/components/layout/TopBar'
 import HelpCenter from '@/components/help/HelpCenter'
@@ -39,15 +37,13 @@ export type Section =
   | 'churn-intervention'
   | 'alert-settings'
   | 'automated-dunning'
-  | 'customers'
   | 'pricing'
-  | 'how-it-works'
 
 function Dashboard() {
   const [activeSection, setActiveSection] = useState<Section>('command-center')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [checklistOpen, setChecklistOpen] = useState(true)
+  const [checklistOpen, setChecklistOpen] = useState(false)
   const [helpSection, setHelpSection] = useState('getting-started')
 
   const openHelp = (section?: string) => {
@@ -71,9 +67,7 @@ function Dashboard() {
       case 'churn-intervention':return <ChurnIntervention />
       case 'alert-settings':    return <AlertSettings />
       case 'automated-dunning': return <AutomatedDunning />
-      case 'customers':         return <Customers />
       case 'pricing':           return <Pricing />
-      case 'how-it-works':      return <HowItWorks />
       default:                  return <CommandCenter />
     }
   }
