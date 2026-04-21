@@ -235,6 +235,11 @@ export default function LandingPage() {
               onMouseLeave={e => (e.target as HTMLElement).style.color = 'var(--text-secondary)'}
             >{link}</a>
           ))}
+          <a href="/how-it-works"
+            style={{ fontSize: '14px', color: 'var(--text-secondary)', textDecoration: 'none' }}
+            onMouseEnter={e => (e.target as HTMLElement).style.color = 'var(--text-primary)'}
+            onMouseLeave={e => (e.target as HTMLElement).style.color = 'var(--text-secondary)'}
+          >How It Works</a>
           <button className="btn-secondary" onClick={handleLogin} disabled={loading} style={{ padding: '8px 16px', fontSize: '13px' }}>
             Sign In
           </button>
@@ -897,11 +902,18 @@ export default function LandingPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '24px', fontSize: '13px', color: 'var(--text-muted)' }}>
-            {['Features', 'Pricing', 'Privacy', 'Terms', 'Security'].map(l => (
-              <a key={l} href="#" style={{ color: 'inherit', textDecoration: 'none' }}
+            {[
+              { label: 'Features', href: '#shields' },
+              { label: 'How It Works', href: '/how-it-works' },
+              { label: 'Pricing', href: '#pricing' },
+              { label: 'Privacy', href: '#' },
+              { label: 'Terms', href: '#' },
+              { label: 'Security', href: '#' },
+            ].map(l => (
+              <a key={l.label} href={l.href} style={{ color: 'inherit', textDecoration: 'none' }}
                 onMouseEnter={e => (e.target as HTMLElement).style.color = 'var(--text-primary)'}
                 onMouseLeave={e => (e.target as HTMLElement).style.color = 'var(--text-muted)'}
-              >{l}</a>
+              >{l.label}</a>
             ))}
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
