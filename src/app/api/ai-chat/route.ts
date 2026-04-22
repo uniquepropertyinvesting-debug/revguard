@@ -130,8 +130,14 @@ ${stripeContext}`
       ],
     }
 
+    const nxcodeApiKey = process.env.NXCODE_API_KEY || ''
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+    }
+
+    if (nxcodeApiKey) {
+      headers['Authorization'] = `Bearer ${nxcodeApiKey}`
     }
 
     if (threadId) {
