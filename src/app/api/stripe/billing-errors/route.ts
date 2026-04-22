@@ -115,6 +115,7 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (err: unknown) {
+    console.error('[stripe/billing-errors] Error:', err instanceof Error ? err.stack : err)
     const message = err instanceof Error ? err.message : 'Stripe error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
