@@ -12,9 +12,13 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_place
 // falls back to env key if no connection is stored yet.
 export function getStripeForUser(userId?: string): Stripe {
   if (userId) {
-    const conn = getStripeConnection(userId)
-    if (conn?.stripe_secret_key) {
-      return new Stripe(conn.stripe_secret_key, { apiVersion: STRIPE_API_VERSION })
+    try {
+      const conn = getStripeConnection(userId)
+      if (conn?.stripe_secret_key) {
+        return new Stripe(conn.stripe_secret_key, { apiVersion: STRIPE_API_VERSION })
+      }
+    } catch (err: unknown) {
+      console.error('[getStripeForUser] Failed to load Stripe connection for user', userId, ':', err instanceof Error ? err.stack : err)
     }
   }
   // Fallback to env key (for dev / before user connects their account)

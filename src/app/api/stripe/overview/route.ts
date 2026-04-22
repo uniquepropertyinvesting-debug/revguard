@@ -76,6 +76,7 @@ export async function GET(req: NextRequest) {
       monthlyChart,
     })
   } catch (err: unknown) {
+    console.error('[stripe/overview] Error:', err instanceof Error ? err.stack : err)
     const message = err instanceof Error ? err.message : 'Stripe error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

@@ -128,6 +128,7 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (err: unknown) {
+    console.error('[stripe/churn-risk] Error:', err instanceof Error ? err.stack : err)
     const message = err instanceof Error ? err.message : 'Stripe error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

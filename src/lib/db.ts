@@ -9,15 +9,20 @@ function getDb(): Database.Database {
   if (db) return db
 
   const dbPath = path.join(process.cwd(), 'revguard.db')
-  db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
+  try {
+    db = new Database(dbPath)
+    db.pragma('journal_mode = WAL')
+    db.pragma('foreign_keys = ON')
 
-  // Run migrations on first connect
-  const migrationPath = path.join(process.cwd(), 'migrations', '001_initial.sql')
-  if (fs.existsSync(migrationPath)) {
-    const sql = fs.readFileSync(migrationPath, 'utf-8')
-    db.exec(sql)
+    // Run migrations on first connect
+    const migrationPath = path.join(process.cwd(), 'migrations', '001_initial.sql')
+    if (fs.existsSync(migrationPath)) {
+      const sql = fs.readFileSync(migrationPath, 'utf-8')
+      db.exec(sql)
+    }
+  } catch (err: unknown) {
+    console.error('[getDb] Failed to initialize database at', dbPath, ':', err instanceof Error ? err.stack : err)
+    throw err
   }
 
   return db
