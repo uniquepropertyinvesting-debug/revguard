@@ -63,7 +63,7 @@ export default function AlertSettings() {
     try {
       const body: any = { userId: getAuthUserId(), ...settings }
       if (resendKey.trim()) body.resendApiKey = resendKey.trim()
-      const r = await fetch('/api/alert-settings', {
+      const r = await authFetch('/api/alert-settings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
@@ -85,7 +85,7 @@ export default function AlertSettings() {
     setTesting(true)
     setStatus(null)
     try {
-      const r = await fetch('/api/alert-settings', {
+      const r = await authFetch('/api/alert-settings', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: getAuthUserId() }),
       })

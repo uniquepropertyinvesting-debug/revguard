@@ -79,7 +79,7 @@ export default function AutomatedDunning() {
     setRunResult(null)
     setActionMsg(null)
     try {
-      const r = await fetch('/api/dunning', {
+      const r = await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'run', userId: getAuthUserId() }),
@@ -100,7 +100,7 @@ export default function AutomatedDunning() {
     setSyncing(true)
     setActionMsg(null)
     try {
-      const r = await fetch('/api/dunning', {
+      const r = await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'sync', userId: getAuthUserId() }),
@@ -118,7 +118,7 @@ export default function AutomatedDunning() {
 
   const cancelSequence = async (invoiceId: string) => {
     try {
-      await fetch('/api/dunning', {
+      await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'cancel', invoiceId, userId: getAuthUserId() }),
@@ -132,7 +132,7 @@ export default function AutomatedDunning() {
     setEnrolling(true)
     setActionMsg(null)
     try {
-      const r = await fetch('/api/dunning', {
+      const r = await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'enroll', invoiceId: enrollInvoiceId.trim(), userId: getAuthUserId() }),

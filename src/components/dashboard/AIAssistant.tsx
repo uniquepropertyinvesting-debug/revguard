@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { authFetch } from '@/lib/auth'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -40,7 +41,7 @@ export default function AIAssistant() {
     setError(null)
 
     try {
-      const res = await fetch('/api/ai-chat', {
+      const res = await authFetch('/api/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages }),

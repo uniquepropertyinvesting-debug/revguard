@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { authFetch } from '@/lib/auth'
 
 interface AuditEntry {
   action: string
@@ -39,7 +40,7 @@ export default function DataProtection() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/data-protection')
+    authFetch('/api/data-protection')
       .then(r => r.json())
       .then(d => {
         if (d.auditLog) setAuditLog(d.auditLog)
