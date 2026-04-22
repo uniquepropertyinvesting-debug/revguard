@@ -113,34 +113,24 @@ export async function POST(req: NextRequest) {
 
     const stripeContext = await getStripeContext()
 
-    const threadId = process.env.THREAD_ID || ''
-    const gatewayUrl = 'https://studio-api.nxcode.io/api/ai-gateway'
+    const openaiApiKey = process.env.OPENAI_API_KEY || ''
 
-    const systemPrompt = `You are RevGuard AI, an expert Revenue Loss Prevention assistant for SaaS companies.
-You have access to LIVE Stripe data for this account. Use it to give specific, accurate, actionable answers.
-Be concise but highly specific — reference exact numbers from the data below.
-Suggest concrete next steps. Use markdown formatting (bold, bullet points) in responses.
-
-${stripeContext}`
+    const systemPrompt = `You are RevGuard AI, an expert Revenue Loss Prevention assistant for SaaS companies.\nYou have access to LIVE Stripe data for this account. Use it to give specific, accurate, actionable answers.\nBe concise but highly specific — reference exact numbers from the data below.\nSuggest concrete next steps. Use markdown formatting (bold, bullet points) in responses.\n\n${stripeContext}`
 
     const payload = {
-      model: 'fast',
+      model: 'gpt-4-turbo',
       messages: [
-        { role: 'user', content: systemPrompt + '\n\nUser message: ' + messages[messages.length - 1].content }
+        { role: 'system', content: systemPrompt },
+        ...messages,
       ],
     }
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
-
-    if (threadId) {
-      headers['X-Workspace-Id'] = threadId
-    }
-
-    const res = await fetch(gatewayUrl, {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`,
+      },
       body: JSON.stringify(payload),
     })
 
@@ -150,7 +140,7 @@ ${stripeContext}`
     }
 
     const data = await res.json()
-    const content = data.content || data.candidates?.[0]?.content?.parts?.[0]?.text || 'Unable to get a response.'
+    const content = data.choices?.[0]?.message?.content || 'Unable to get a response.'
 
     return NextResponse.json({ content })
   } catch (err: unknown) {
