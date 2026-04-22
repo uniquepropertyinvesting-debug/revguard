@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { authFetch } from '@/lib/auth'
 
 interface Alert {
   id: string
@@ -40,7 +41,7 @@ export default function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null)
 
   const fetchAlerts = () => {
-    fetch('/api/alerts?limit=20')
+    authFetch('/api/alerts?limit=20')
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.alerts)) setAlerts(d.alerts) })
       .catch(() => {})
@@ -64,13 +65,13 @@ export default function NotificationBell() {
   const unread = alerts.filter(a => !a.read).length
 
   const markAllRead = () => {
-    fetch('/api/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markAllRead: true }) })
+    authFetch('/api/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markAllRead: true }) })
       .then(() => { setAlerts(a => a.map(x => ({ ...x, read: 1 }))); })
       .catch(() => {})
   }
 
   const markRead = (id: string) => {
-    fetch('/api/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: id }) })
+    authFetch('/api/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: id }) })
       .then(() => setAlerts(a => a.map(x => x.id === id ? { ...x, read: 1 } : x)))
       .catch(() => {})
   }

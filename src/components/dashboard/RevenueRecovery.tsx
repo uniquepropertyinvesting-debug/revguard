@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useStripeRecovery } from '@/lib/useStripe'
-import { getAuthUserId } from '@/lib/auth'
+import { authFetch, getAuthUserId } from '@/lib/auth'
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -30,7 +30,7 @@ export default function RevenueRecovery() {
   const handleRetry = async (invoiceId: string) => {
     setRetryingId(invoiceId)
     try {
-      const res = await fetch('/api/stripe/retry', {
+      const res = await authFetch('/api/stripe/retry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invoiceId, userId: getAuthUserId() }),

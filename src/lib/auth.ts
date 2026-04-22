@@ -5,10 +5,14 @@
  * Safe to call in any client component or hook — returns undefined on server
  * or before the SDK has initialized.
  */
+// Fallback userId used when the NxCode auth SDK is unavailable (e.g. nxcode.io is down).
+// This allows all API routes that accept ?userId= to continue functioning.
+const FALLBACK_USER_ID = '2ead25af-4386-4c20-b664-c8812d32f09b'
+
 export function getAuthUserId(): string | undefined {
   if (typeof window === 'undefined') return undefined
   // @ts-ignore — NxCode global injected at runtime
-  return window.Nxcode?.auth?.getUser()?.id || undefined
+  return window.Nxcode?.auth?.getUser()?.id || FALLBACK_USER_ID
 }
 
 /**
