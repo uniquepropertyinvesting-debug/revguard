@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     const systemPrompt = `You are RevGuard AI, an expert Revenue Loss Prevention assistant for SaaS companies.\nYou have access to LIVE Stripe data for this account. Use it to give specific, accurate, actionable answers.\nBe concise but highly specific — reference exact numbers from the data below.\nSuggest concrete next steps. Use markdown formatting (bold, bullet points) in responses.\n\n${stripeContext}`
 
     const payload = {
-      model: 'gpt-4-turbo',
+      model: process.env.OPENAI_MODEL || 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
