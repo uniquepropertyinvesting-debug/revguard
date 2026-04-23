@@ -60,6 +60,13 @@ export function saveStripeConnection(userId: string, secretKey: string, publisha
   )
 }
 
+export function saveWebhookSecret(userId: string, webhookSecret: string) {
+  const db = getDb()
+  db.prepare(`
+    UPDATE stripe_connections SET webhook_secret = ? WHERE user_id = ?
+  `).run(encrypt(webhookSecret), userId)
+}
+
 export function getStripeConnection(userId: string) {
   const row = getDb().prepare('SELECT * FROM stripe_connections WHERE user_id = ?').get(userId) as any
   if (!row) return null
