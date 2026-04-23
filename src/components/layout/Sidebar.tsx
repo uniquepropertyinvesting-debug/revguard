@@ -100,9 +100,16 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
         setLastSync(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
       } catch {}
     }
-    // Slight delay so auth is ready
-    const t = setTimeout(fetchCounts, 1500)
-    return () => clearTimeout(t)
+    // Slight delay so auth is ready, then poll every 5 seconds
+    let interval: ReturnType<typeof setInterval>
+    const t = setTimeout(() => {
+      fetchCounts()
+      interval = setInterval(fetchCounts, 5000)
+    }, 1500)
+    return () => {
+      clearTimeout(t)
+      clearInterval(interval)
+    }
   }, [])
 
   const handleLogout = async () => {
