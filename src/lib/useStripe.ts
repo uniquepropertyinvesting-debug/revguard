@@ -3,153 +3,217 @@
 import { useState, useEffect } from 'react'
 import { authFetch } from '@/lib/auth'
 
-export function useStripeROI() {
+export function useStripeROI(refreshInterval = 5000) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/roi')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/roi')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d)
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
 }
 
-export function useStripeOverview() {
+export function useStripeOverview(refreshInterval = 5000) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/overview')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/overview')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d)
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
 }
 
-export function useStripeFailedPayments() {
+export function useStripeFailedPayments(refreshInterval = 5000) {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/failed-payments')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/failed-payments')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d.failed || [])
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
 }
 
-export function useStripeChurnRisk() {
+export function useStripeChurnRisk(refreshInterval = 5000) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/churn-risk')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/churn-risk')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d)
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
 }
 
-export function useStripeBillingErrors() {
+export function useStripeBillingErrors(refreshInterval = 5000) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/billing-errors')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/billing-errors')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d)
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
 }
 
-export function useStripeUsageMismatch() {
+export function useStripeUsageMismatch(refreshInterval = 5000) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/usage-mismatch')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/usage-mismatch')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d)
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
 }
 
-export function useStripeRecovery() {
+export function useStripeRecovery(refreshInterval = 5000) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/recovery')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/recovery')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d)
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
 }
 
-export function useStripeCustomers() {
+export function useStripeCustomers(refreshInterval = 5000) {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    authFetch('/api/stripe/customers')
-      .then(r => r.json())
-      .then(d => {
+    const fetchData = async () => {
+      try {
+        const r = await authFetch('/api/stripe/customers')
+        const d = await r.json()
         if (d.error) setError(d.error)
         else setData(d.customers || [])
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      } catch (e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+    const interval = setInterval(fetchData, refreshInterval)
+    return () => clearInterval(interval)
   }, [])
 
   return { data, loading, error }
