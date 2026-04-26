@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { authFetch } from '@/lib/auth'
 
 interface StripeConnectionStatus {
   connected: boolean
@@ -37,6 +36,11 @@ const comingSoon = [
   },
 ]
 
+function getUserId(): string {
+  // @ts-ignore
+  return window.Nxcode?.auth?.getUser()?.id || 'default'
+}
+
 export default function Integrations() {
   const [stripeStatus, setStripeStatus] = useState<StripeConnectionStatus | null>(null)
   const [showStripeForm, setShowStripeForm] = useState(false)
@@ -48,10 +52,25 @@ export default function Integrations() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   useEffect(() => {
-    authFetch('/api/db/stripe-connect')
-      .then(r => r.json())
-      .then(data => setStripeStatus(data))
-      .catch(() => setStripeStatus({ connected: false }))
+    const load = async () => {
+      try {
+        // @ts-ignore
+        const tryGet = () => {
+          // @ts-ignore
+          const sdk = window.Nxcode
+          if (!sdk?.auth) { setTimeout(tryGet, 500); return }
+          const userId = sdk.auth.isLoggedIn() ? sdk.auth.getUser()?.id || 'default' : 'default'
+          fetch(`/api/db/stripe-connect?userId=${userId}`)
+            .then(r => r.json())
+            .then(data => setStripeStatus(data))
+            .catch(() => setStripeStatus({ connected: false }))
+        }
+        tryGet()
+      } catch {
+        setStripeStatus({ connected: false })
+      }
+    }
+    load()
   }, [])
 
   const handleSave = async () => {
@@ -62,10 +81,11 @@ export default function Integrations() {
     setSaving(true)
     setSaveMsg('')
     try {
-      const res = await authFetch('/api/db/stripe-connect', {
+      const userId = getUserId()
+      const res = await fetch('/api/db/stripe-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secretKey, webhookSecret: webhookSecret || undefined }),
+        body: JSON.stringify({ userId, secretKey, webhookSecret: webhookSecret || undefined }),
       })
       const data = await res.json()
       if (data.success) {

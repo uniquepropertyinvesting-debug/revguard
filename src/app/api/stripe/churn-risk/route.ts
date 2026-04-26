@@ -56,7 +56,7 @@ function churnSignals(sub: {
 
 export async function GET(req: NextRequest) {
   const userId = (await getVerifiedUserId(req)) ?? undefined
-  const stripe = await getStripeForUser(userId)
+  const stripe = getStripeForUser(userId)
   try {
     const [subscriptions, customers] = await Promise.all([
       paginate(stripe.subscriptions.list({ limit: 100, status: 'all' })),

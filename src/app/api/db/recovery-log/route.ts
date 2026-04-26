@@ -3,8 +3,8 @@ import { getRecoveryActions } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = undefined
-    const actions = await getRecoveryActions(userId, 100)
+    const userId = req.nextUrl.searchParams.get('userId') || undefined
+    const actions = getRecoveryActions(userId, 100)
     const totalRecovered = actions
       .filter((a: any) => a.status === 'success')
       .reduce((sum: number, a: any) => sum + a.amount, 0)

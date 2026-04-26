@@ -1,78 +1,61 @@
 "use client"
 
+/**
+ * OAuth Login Form using Nxcode SDK
+ *
+ * Provides Google and GitHub login buttons. Add your own styling.
+ */
+
 import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
 interface LoginFormProps {
   onSuccess?: () => void
   className?: string
-  onSwitchToSignup?: () => void
 }
 
-export function LoginForm({ onSuccess, className, onSwitchToSignup }: LoginFormProps) {
+export function LoginForm({ onSuccess, className }: LoginFormProps) {
   const { login } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState<'google' | 'github' | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleLogin = async (provider: 'google' | 'github') => {
     setError('')
-    setIsLoading(true)
+    setIsLoading(provider)
 
     try {
-      await login(email, password)
+      await login(provider)
       onSuccess?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
-      setIsLoading(false)
+      setIsLoading(null)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className={className}>
-      <h2>Sign In</h2>
+    <div className={className}>
+      <h2>Login</h2>
 
       {error && <div data-error>{error}</div>}
 
-      <div>
-        <label htmlFor="login-email">Email</label>
-        <input
-          id="login-email"
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-          placeholder="you@company.com"
-        />
+      <div data-login-buttons>
+        <button
+          onClick={() => handleLogin('google')}
+          disabled={isLoading !== null}
+          data-provider="google"
+        >
+          {isLoading === 'google' ? 'Signing in...' : 'Continue with Google'}
+        </button>
+
+        <button
+          onClick={() => handleLogin('github')}
+          disabled={isLoading !== null}
+          data-provider="github"
+        >
+          {isLoading === 'github' ? 'Signing in...' : 'Continue with GitHub'}
+        </button>
       </div>
-
-      <div>
-        <label htmlFor="login-password">Password</label>
-        <input
-          id="login-password"
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-          placeholder="Your password"
-        />
-      </div>
-
-      <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Signing in...' : 'Sign In'}
-      </button>
-
-      {onSwitchToSignup && (
-        <p>
-          Don&apos;t have an account?{' '}
-          <button type="button" onClick={onSwitchToSignup}>
-            Sign up
-          </button>
-        </p>
-      )}
-    </form>
+    </div>
   )
 }

@@ -13,7 +13,7 @@ async function paginate<T>(iter: AsyncIterable<T>, maxItems = 2000): Promise<T[]
 
 export async function GET(req: NextRequest) {
   const userId = (await getVerifiedUserId(req)) ?? undefined
-  const stripe = await getStripeForUser(userId)
+  const stripe = getStripeForUser(userId)
   try {
     const [customers, subscriptions] = await Promise.all([
       paginate(stripe.customers.list({ limit: 100 })),

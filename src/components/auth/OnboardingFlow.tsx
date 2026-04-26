@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { getAuthUserId } from '@/lib/auth'
 
 interface User {
   id: string
   email: string
-  name?: string | null
-  avatar?: string | null
+  name: string | null
+  avatar: string | null
+  balance: number
 }
 
 interface OnboardingFlowProps {
@@ -65,10 +66,11 @@ export default function OnboardingFlow({ user, onComplete }: OnboardingFlowProps
     setStripeKeyError('')
     setConnecting('stripe')
     try {
+      const userId = getAuthUserId()
       const res = await fetch('/api/db/stripe-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secretKey: key }),
+        body: JSON.stringify({ userId, secretKey: key }),
       })
       const data = await res.json()
       if (data.error) {

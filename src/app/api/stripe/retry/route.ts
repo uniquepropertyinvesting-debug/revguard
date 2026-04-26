@@ -6,8 +6,8 @@ import { getVerifiedUserId } from '@/lib/serverAuth'
 
 export async function POST(req: NextRequest) {
   try {
-    const { invoiceId } = await req.json()
-    const verifiedUserId = await getVerifiedUserId(req)
+    const { invoiceId, userId } = await req.json()
+    const verifiedUserId = (await getVerifiedUserId(req)) ?? userId
     if (!invoiceId) {
       return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
     }
@@ -21,14 +21,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const stripe = await getStripeForUser(verifiedUserId)
+    const stripe = getStripeForUser(verifiedUserId)
 
     // Attempt to pay the invoice now via Stripe
     const result = await stripe.invoices.pay(invoiceId)
     const amount = (result.amount_paid || 0) / 100
 
     // Log the successful recovery to DB
-    await logRecoveryAction({
+    logRecoveryAction({
       userId: verifiedUserId,
       invoiceId,
       amount,
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       result: `Manually retried and recovered $${amount.toFixed(2)}`,
     })
 
-    await createAlert({
+    createAlert({
       userId: verifiedUserId,
       type: 'payment_recovered',
       severity: 'success',
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     // Log the failed retry attempt
     try {
       const body = await (err as any)?.raw ? JSON.parse('{}') : {}
-      await logRecoveryAction({
+      logRecoveryAction({
         invoiceId: 'unknown',
         amount: 0,
         currency: 'USD',

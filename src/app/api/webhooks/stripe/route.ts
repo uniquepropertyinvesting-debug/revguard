@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
   // Falls back to env credentials if not provided (single-tenant / dev mode).
   const userId = req.nextUrl.searchParams.get('userId') || undefined
 
-  const webhookSecret = await getWebhookSecretForUser(userId)
-  const stripe = await getStripeForUser(userId)
+  const webhookSecret = getWebhookSecretForUser(userId)
+  const stripe = getStripeForUser(userId)
 
   let event: Stripe.Event
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Save raw event to DB (scoped to tenant)
-  await saveWebhookEvent(event.id, event.type, event, userId)
+  saveWebhookEvent(event.id, event.type, event, userId)
 
   // Handle specific events
   try {
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         const severity = amount >= 1000 ? 'critical' : 'warning'
         const title = 'Payment Failed'
         const message = `Payment of $${amount.toFixed(2)} failed. Reason: ${pi.last_payment_error?.message || 'Unknown'}`
-        await createAlert({ userId, type: 'payment_failed', severity, title, message, metadata: { paymentIntentId: pi.id, amount, customerId: pi.customer } })
+        createAlert({ userId, type: 'payment_failed', severity, title, message, metadata: { paymentIntentId: pi.id, amount, customerId: pi.customer } })
         sendAlertEmail('payment_failed', title, message, severity, amount)
         break
       }
@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
         const severity2 = amount >= 500 ? 'critical' : 'warning'
         const title2 = 'Invoice Payment Failed'
         const msg2 = `Invoice #${inv.number || inv.id.slice(0, 8)} for $${amount.toFixed(2)} failed after ${inv.attempt_count} attempt(s)`
-        await createAlert({ userId, type: 'invoice_failed', severity: severity2, title: title2, message: msg2, metadata: { invoiceId: inv.id, amount, customerId: inv.customer, attempts: inv.attempt_count } })
+        createAlert({ userId, type: 'invoice_failed', severity: severity2, title: title2, message: msg2, metadata: { invoiceId: inv.id, amount, customerId: inv.customer, attempts: inv.attempt_count } })
         sendAlertEmail('invoice_failed', title2, msg2, severity2, amount)
-        await logRecoveryAction({
+        logRecoveryAction({
           userId,
           invoiceId: inv.id,
           customerId: typeof inv.customer === 'string' ? inv.customer : undefined,
@@ -91,9 +91,9 @@ export async function POST(req: NextRequest) {
         if (inv.attempt_count > 1) {
           const recTitle = 'Payment Recovered'
           const recMsg = `Invoice of $${amount.toFixed(2)} successfully recovered after ${inv.attempt_count} attempt(s)`
-          await createAlert({ userId, type: 'payment_recovered', severity: 'success', title: recTitle, message: recMsg, metadata: { invoiceId: inv.id, amount, customerId: inv.customer } })
+          createAlert({ userId, type: 'payment_recovered', severity: 'success', title: recTitle, message: recMsg, metadata: { invoiceId: inv.id, amount, customerId: inv.customer } })
           sendAlertEmail('payment_recovered', recTitle, recMsg, 'success', amount)
-          await logRecoveryAction({
+          logRecoveryAction({
             userId,
             invoiceId: inv.id,
             customerId: typeof inv.customer === 'string' ? inv.customer : undefined,
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         const mrr = sub.items.data.reduce(
           (sum, i) => sum + (i.price.unit_amount || 0) * (i.quantity || 1), 0
         ) / 100
-        await createAlert({
+        createAlert({
           userId,
           type: 'subscription_canceled',
           severity: mrr >= 500 ? 'critical' : 'warning',
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription
         if (sub.status === 'past_due') {
-          await createAlert({
+          createAlert({
             userId,
             type: 'subscription_past_due',
             severity: 'warning',
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       case 'charge.dispute.created': {
         const dispute = event.data.object as Stripe.Dispute
         const amount = dispute.amount / 100
-        await createAlert({
+        createAlert({
           userId,
           type: 'dispute_created',
           severity: 'critical',

@@ -1,24 +1,46 @@
 "use client"
 
-import { useState, useEffect, useCallback, createContext, useContext } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import type { User } from '@supabase/supabase-js'
+/**
+ * Auth hook wrapping Nxcode SDK
+ *
+ * Usage:
+ *   const { user, isAuthenticated, login, logout } = useAuth()
+ */
 
-export interface AuthUser {
+import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+
+// Nxcode SDK types (SDK loaded via script tag as global)
+export interface NxcodeUser {
   id: string
   email: string
   name?: string
   avatar?: string
 }
 
+interface NxcodeSDK {
+  auth: {
+    login(provider?: 'google' | 'github'): Promise<NxcodeUser>
+    logout(): Promise<void>
+    getUser(): NxcodeUser | null
+    getToken(): string | null
+    isLoggedIn(): boolean
+    onAuthStateChange(callback: (user: NxcodeUser | null) => void): () => void
+  }
+  ready(): Promise<void>
+  isReady(): boolean
+}
+
+declare const Nxcode: NxcodeSDK
+
+// ==================== Context ====================
+
 interface AuthContextType {
-  user: AuthUser | null
+  user: NxcodeUser | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string, name?: string) => Promise<void>
+  login: (provider?: 'google' | 'github') => Promise<NxcodeUser>
   logout: () => Promise<void>
-  getToken: () => Promise<string | null>
+  getToken: () => string | null
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -31,64 +53,50 @@ export function useAuth(): AuthContextType {
   return context
 }
 
+// ==================== Provider Hook ====================
+
 export function useAuthProvider(): AuthContextType {
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const [user, setUser] = useState<NxcodeUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
+    let unsubscribe: (() => void) | null = null
 
-    const mapUser = (u: User | null): AuthUser | null => {
-      if (!u) return null
-      return {
-        id: u.id,
-        email: u.email ?? '',
-        name: u.user_metadata?.name ?? u.user_metadata?.full_name ?? undefined,
-        avatar: u.user_metadata?.avatar_url ?? undefined,
+    const init = async () => {
+      try {
+        await Nxcode.ready()
+        unsubscribe = Nxcode.auth.onAuthStateChange((user) => {
+          setUser(user)
+          setIsLoading(false)
+        })
+      } catch (error) {
+        console.error('Failed to initialize Nxcode SDK:', error)
+        setIsLoading(false)
       }
     }
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(mapUser(user))
-      setIsLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(mapUser(session?.user ?? null))
-      setIsLoading(false)
-    })
+    init()
 
     return () => {
-      subscription.unsubscribe()
+      if (unsubscribe) unsubscribe()
     }
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
-  }, [])
-
-  const signup = useCallback(async (email: string, password: string, name?: string) => {
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    })
-    if (error) throw error
+  const login = useCallback(async (provider: 'google' | 'github' = 'google') => {
+    await Nxcode.ready()
+    const user = await Nxcode.auth.login(provider)
+    setUser(user)
+    return user
   }, [])
 
   const logout = useCallback(async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await Nxcode.ready()
+    await Nxcode.auth.logout()
     setUser(null)
   }, [])
 
-  const getToken = useCallback(async () => {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token ?? null
+  const getToken = useCallback(() => {
+    return Nxcode.auth.getToken()
   }, [])
 
   return {
@@ -96,9 +104,8 @@ export function useAuthProvider(): AuthContextType {
     isLoading,
     isAuthenticated: !!user,
     login,
-    signup,
     logout,
-    getToken,
+    getToken
   }
 }
 

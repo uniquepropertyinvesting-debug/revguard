@@ -47,7 +47,7 @@ export async function GET() {
     const billingErrorRevenue = openInvoices.reduce((sum, i) => sum + (i.amount_due || 0), 0) / 100
 
     // --- Recovery stats from DB ---
-    const recoveryActions = await getRecoveryActions(undefined, 200)
+    const recoveryActions = getRecoveryActions(undefined, 200)
     const successfulRecoveries = recoveryActions.filter((a: any) => a.status === 'success')
     const totalRecovered = successfulRecoveries.reduce((sum: number, a: any) => sum + a.amount, 0)
     const recoveryRate = recoveryActions.length > 0
