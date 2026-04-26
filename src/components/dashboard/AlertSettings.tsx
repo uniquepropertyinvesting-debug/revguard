@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { authFetch, getAuthUserId } from '@/lib/auth'
+import { authFetch } from '@/lib/auth'
 
 interface Settings {
   notifyEmail: string
@@ -61,7 +61,7 @@ export default function AlertSettings() {
     setSaving(true)
     setStatus(null)
     try {
-      const body: any = { userId: getAuthUserId(), ...settings }
+      const body: any = { ...settings }
       if (resendKey.trim()) body.resendApiKey = resendKey.trim()
       const r = await authFetch('/api/alert-settings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -87,7 +87,7 @@ export default function AlertSettings() {
     try {
       const r = await authFetch('/api/alert-settings', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: getAuthUserId() }),
+        body: JSON.stringify({}),
       })
       const d = await r.json()
       if (d.error) throw new Error(d.error)

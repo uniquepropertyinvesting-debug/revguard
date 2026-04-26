@@ -43,7 +43,15 @@ export default function NotificationBell() {
   const fetchAlerts = () => {
     authFetch('/api/alerts?limit=20')
       .then(r => r.json())
-      .then(d => { if (Array.isArray(d.alerts)) setAlerts(d.alerts) })
+      .then(d => {
+        if (Array.isArray(d.alerts)) {
+          setAlerts(d.alerts.map((a: any) => ({
+            ...a,
+            created_at: typeof a.created_at === 'string' ? Math.floor(new Date(a.created_at).getTime() / 1000) : a.created_at,
+            read: a.read === true || a.read === 1 ? 1 : 0,
+          })))
+        }
+      })
       .catch(() => {})
   }
 

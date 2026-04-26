@@ -1,8 +1,3 @@
 name = "revenue-loss-prevention"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
-
-[[d1_databases]]
-binding = "DB"
-database_name = "nxcode-4e8b8e4b-revguard-db"
-database_id = "791508be-ad08-4652-843b-f3b1931950a2"

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Section } from '@/app/page'
 import { authFetch } from '@/lib/auth'
+import { useAuth } from '@/modules/auth/hooks/useAuth'
 
 interface SidebarProps {
   activeSection: Section
@@ -67,21 +68,10 @@ const NAV_GROUPS_BASE = [
 ]
 
 export default function Sidebar({ activeSection, setActiveSection, isOpen }: SidebarProps) {
-  const [user, setUser] = useState<User | null>(null)
+  const { user, logout } = useAuth()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [alertCounts, setAlertCounts] = useState<Record<string, number>>({})
   const [lastSync, setLastSync] = useState<string>('')
-
-  useEffect(() => {
-    const tryGetUser = () => {
-      // @ts-ignore
-      const sdk = window.Nxcode
-      if (!sdk?.auth) { setTimeout(tryGetUser, 500); return }
-      if (sdk.auth.isLoggedIn()) setUser(sdk.auth.getUser())
-      sdk.auth.onAuthStateChange((u: User | null) => setUser(u))
-    }
-    tryGetUser()
-  }, [])
 
   // Fetch live alert badge counts from overview + billing-errors + churn-risk APIs
   useEffect(() => {
@@ -106,8 +96,7 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
   }, [])
 
   const handleLogout = async () => {
-    // @ts-ignore
-    await window.Nxcode?.auth?.logout()
+    await logout()
   }
 
   const initials = user?.name

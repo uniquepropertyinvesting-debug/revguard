@@ -1,67 +1,56 @@
-import Database from 'better-sqlite3'
-import path from 'path'
-import fs from 'fs'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { encrypt, decrypt } from '@/lib/crypto'
 
-let db: Database.Database | null = null
+// --- Users ---
+export async function upsertUser(id: string, email: string, name?: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('users')
+    .upsert({ id, email, name: name || null }, { onConflict: 'id' })
+  if (error) console.error('[upsertUser]', error.message)
+}
 
-function getDb(): Database.Database {
-  if (db) return db
+export async function getUserById(id: string) {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  return data
+}
 
-  const dbPath = path.join(process.cwd(), 'revguard.db')
-  try {
-    db = new Database(dbPath)
-    db.pragma('journal_mode = WAL')
-    db.pragma('foreign_keys = ON')
+// --- Stripe Connections ---
+export async function saveStripeConnection(userId: string, secretKey: string, publishableKey?: string, webhookSecret?: string) {
+  const supabase = await createClient()
+  const { data: existing } = await supabase
+    .from('stripe_connections')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
 
-    // Run migrations on first connect
-    const migrationPath = path.join(process.cwd(), 'migrations', '001_initial.sql')
-    if (fs.existsSync(migrationPath)) {
-      const sql = fs.readFileSync(migrationPath, 'utf-8')
-      db.exec(sql)
-    }
-  } catch (err: unknown) {
-    console.error('[getDb] Failed to initialize database at', dbPath, ':', err instanceof Error ? err.stack : err)
-    throw err
+  const payload = {
+    user_id: userId,
+    stripe_secret_key: encrypt(secretKey),
+    stripe_publishable_key: publishableKey ? encrypt(publishableKey) : null,
+    webhook_secret: webhookSecret ? encrypt(webhookSecret) : null,
   }
 
-  return db
+  if (existing) {
+    await supabase.from('stripe_connections').update(payload).eq('id', existing.id)
+  } else {
+    await supabase.from('stripe_connections').insert(payload)
+  }
 }
 
-// --- Users ---
-export function upsertUser(id: string, email: string, name?: string) {
-  const db = getDb()
-  db.prepare(`
-    INSERT INTO users (id, email, name) VALUES (?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name
-  `).run(id, email, name || null)
-}
+export async function getStripeConnection(userId: string) {
+  const supabase = await createClient()
+  const { data: row } = await supabase
+    .from('stripe_connections')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
 
-export function getUserById(id: string) {
-  return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as any
-}
-
-// --- Stripe Connections (multi-tenant) ---
-export function saveStripeConnection(userId: string, secretKey: string, publishableKey?: string, webhookSecret?: string) {
-  const db = getDb()
-  const id = `sc_${userId}`
-  db.prepare(`
-    INSERT INTO stripe_connections (id, user_id, stripe_secret_key, stripe_publishable_key, webhook_secret)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      stripe_secret_key = excluded.stripe_secret_key,
-      stripe_publishable_key = excluded.stripe_publishable_key,
-      webhook_secret = excluded.webhook_secret
-  `).run(
-    id, userId,
-    encrypt(secretKey),
-    publishableKey ? encrypt(publishableKey) : null,
-    webhookSecret ? encrypt(webhookSecret) : null,
-  )
-}
-
-export function getStripeConnection(userId: string) {
-  const row = getDb().prepare('SELECT * FROM stripe_connections WHERE user_id = ?').get(userId) as any
   if (!row) return null
   return {
     ...row,
@@ -72,30 +61,45 @@ export function getStripeConnection(userId: string) {
 }
 
 // --- Webhook Events ---
-export function saveWebhookEvent(stripeEventId: string, eventType: string, payload: any, userId?: string) {
-  const db = getDb()
-  const id = `wh_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  try {
-    db.prepare(`
-      INSERT INTO webhook_events (id, user_id, event_type, stripe_event_id, payload)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, userId || null, eventType, stripeEventId, JSON.stringify(payload))
-    return id
-  } catch {
-    return null // duplicate event
-  }
+export async function saveWebhookEvent(stripeEventId: string, eventType: string, payload: any, userId?: string) {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .from('webhook_events')
+    .insert({
+      user_id: userId || null,
+      event_type: eventType,
+      stripe_event_id: stripeEventId,
+      payload: payload,
+    })
+    .select('id')
+    .maybeSingle()
+
+  if (error) return null
+  return data?.id ?? null
 }
 
-export function getWebhookEvents(userId?: string, limit = 50) {
-  const db = getDb()
-  if (userId) {
-    return db.prepare('SELECT * FROM webhook_events WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as any[]
+export async function getWebhookEvents(userId?: string, limit = 50) {
+  if (!userId) {
+    const serviceClient = createServiceClient()
+    const { data } = await serviceClient
+      .from('webhook_events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    return data ?? []
   }
-  return db.prepare('SELECT * FROM webhook_events ORDER BY created_at DESC LIMIT ?').all(limit) as any[]
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('webhook_events')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return data ?? []
 }
 
 // --- Recovery Actions ---
-export function logRecoveryAction(data: {
+export async function logRecoveryAction(data: {
   userId?: string
   invoiceId: string
   customerId?: string
@@ -106,29 +110,47 @@ export function logRecoveryAction(data: {
   status: string
   result?: string
 }) {
-  const db = getDb()
-  const id = `ra_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  db.prepare(`
-    INSERT INTO recovery_actions (id, user_id, invoice_id, customer_id, customer_email, amount, currency, action, status, result)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, data.userId || null, data.invoiceId, data.customerId || null,
-    data.customerEmail || null, data.amount, data.currency || 'USD',
-    data.action, data.status, data.result || null
-  )
-  return id
+  const supabase = createServiceClient()
+  const { data: row } = await supabase
+    .from('recovery_actions')
+    .insert({
+      user_id: data.userId || null,
+      invoice_id: data.invoiceId,
+      customer_id: data.customerId || null,
+      customer_email: data.customerEmail || null,
+      amount: data.amount,
+      currency: data.currency || 'USD',
+      action: data.action,
+      status: data.status,
+      result: data.result || null,
+    })
+    .select('id')
+    .maybeSingle()
+  return row?.id ?? null
 }
 
-export function getRecoveryActions(userId?: string, limit = 100) {
-  const db = getDb()
-  if (userId) {
-    return db.prepare('SELECT * FROM recovery_actions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as any[]
+export async function getRecoveryActions(userId?: string, limit = 100) {
+  if (!userId) {
+    const serviceClient = createServiceClient()
+    const { data } = await serviceClient
+      .from('recovery_actions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    return data ?? []
   }
-  return db.prepare('SELECT * FROM recovery_actions ORDER BY created_at DESC LIMIT ?').all(limit) as any[]
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('recovery_actions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return data ?? []
 }
 
 // --- Alerts ---
-export function createAlert(data: {
+export async function createAlert(data: {
   userId?: string
   type: string
   severity: 'info' | 'warning' | 'critical' | 'success'
@@ -136,63 +158,106 @@ export function createAlert(data: {
   message: string
   metadata?: any
 }) {
-  const db = getDb()
-  const id = `al_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  db.prepare(`
-    INSERT INTO alerts (id, user_id, type, severity, title, message, metadata)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, data.userId || null, data.type, data.severity, data.title, data.message, data.metadata ? JSON.stringify(data.metadata) : null)
-  return id
+  const supabase = createServiceClient()
+  const { data: row } = await supabase
+    .from('alerts')
+    .insert({
+      user_id: data.userId || null,
+      type: data.type,
+      severity: data.severity,
+      title: data.title,
+      message: data.message,
+      metadata: data.metadata || null,
+    })
+    .select('id')
+    .maybeSingle()
+  return row?.id ?? null
 }
 
-export function getAlerts(userId?: string, limit = 50) {
-  const db = getDb()
-  if (userId) {
-    return db.prepare('SELECT * FROM alerts WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as any[]
+export async function getAlerts(userId?: string, limit = 50) {
+  if (!userId) {
+    const serviceClient = createServiceClient()
+    const { data } = await serviceClient
+      .from('alerts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    return data ?? []
   }
-  return db.prepare('SELECT * FROM alerts ORDER BY created_at DESC LIMIT ?').all(limit) as any[]
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('alerts')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return data ?? []
 }
 
-export function markAlertRead(id: string) {
-  getDb().prepare('UPDATE alerts SET read = 1 WHERE id = ?').run(id)
+export async function markAlertRead(id: string) {
+  const supabase = await createClient()
+  await supabase.from('alerts').update({ read: true }).eq('id', id)
 }
 
-export function getUnreadAlertCount(userId?: string) {
-  const db = getDb()
-  const row = userId
-    ? db.prepare('SELECT COUNT(*) as count FROM alerts WHERE user_id = ? AND read = 0').get(userId) as any
-    : db.prepare('SELECT COUNT(*) as count FROM alerts WHERE read = 0').get() as any
-  return row?.count || 0
+export async function getUnreadAlertCount(userId?: string) {
+  const supabase = await createClient()
+  let query = supabase
+    .from('alerts')
+    .select('id', { count: 'exact', head: true })
+    .eq('read', false)
+
+  if (userId) query = query.eq('user_id', userId)
+
+  const { count } = await query
+  return count ?? 0
 }
 
 // --- Interventions ---
-export function createIntervention(data: {
+export async function createIntervention(data: {
   userId?: string
   customerId: string
   customerEmail?: string
   type: string
   notes?: string
 }) {
-  const db = getDb()
-  const id = `int_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  db.prepare(`
-    INSERT INTO interventions (id, user_id, customer_id, customer_email, type, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, data.userId || null, data.customerId, data.customerEmail || null, data.type, data.notes || null)
-  return id
+  const supabase = await createClient()
+  const { data: row } = await supabase
+    .from('interventions')
+    .insert({
+      user_id: data.userId || null,
+      customer_id: data.customerId,
+      customer_email: data.customerEmail || null,
+      type: data.type,
+      notes: data.notes || null,
+    })
+    .select('id')
+    .maybeSingle()
+  return row?.id ?? null
 }
 
-export function getInterventions(userId?: string, limit = 50) {
-  const db = getDb()
-  if (userId) {
-    return db.prepare('SELECT * FROM interventions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as any[]
-  }
-  return db.prepare('SELECT * FROM interventions ORDER BY created_at DESC LIMIT ?').all(limit) as any[]
+export async function getInterventions(userId?: string, limit = 50) {
+  const supabase = await createClient()
+  let query = supabase
+    .from('interventions')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (userId) query = query.eq('user_id', userId)
+
+  const { data } = await query
+  return data ?? []
 }
 
 // --- Alert Settings ---
-export function getAlertSettings(userId: string) {
-  const row = getDb().prepare('SELECT * FROM alert_settings WHERE user_id = ?').get(userId) as any
+export async function getAlertSettings(userId: string) {
+  const supabase = await createClient()
+  const { data: row } = await supabase
+    .from('alert_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   if (!row) return null
   return {
     ...row,
@@ -200,70 +265,7 @@ export function getAlertSettings(userId: string) {
   }
 }
 
-// --- Dunning Sequences ---
-export function upsertDunningSequence(data: {
-  invoiceId: string
-  userId?: string
-  customerId?: string
-  customerEmail: string
-  customerName?: string
-  amount: number
-  currency?: string
-}) {
-  const db = getDb()
-  const id = `ds_${data.invoiceId}`
-  const nowSec = Math.floor(Date.now() / 1000)
-  // Day 1 email due immediately (next_email_due_at = now)
-  db.prepare(`
-    INSERT INTO dunning_sequences
-      (id, user_id, invoice_id, customer_id, customer_email, customer_name, amount, currency, status, step, next_email_due_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 0, ?)
-    ON CONFLICT(invoice_id) DO NOTHING
-  `).run(id, data.userId || null, data.invoiceId, data.customerId || null,
-    data.customerEmail, data.customerName || null, data.amount,
-    data.currency || 'USD', nowSec)
-  return id
-}
-
-export function getDunningSequences(userId?: string, limit = 100) {
-  const db = getDb()
-  if (userId) {
-    return db.prepare('SELECT * FROM dunning_sequences WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as any[]
-  }
-  return db.prepare('SELECT * FROM dunning_sequences ORDER BY created_at DESC LIMIT ?').all(limit) as any[]
-}
-
-export function getDunningSequenceDue(now?: number) {
-  const ts = now ?? Math.floor(Date.now() / 1000)
-  return getDb().prepare(`
-    SELECT * FROM dunning_sequences
-    WHERE status = 'active' AND step < 3 AND (next_email_due_at IS NULL OR next_email_due_at <= ?)
-    ORDER BY next_email_due_at ASC LIMIT 50
-  `).all(ts) as any[]
-}
-
-export function advanceDunningStep(id: string, nextDueAt: number | null) {
-  const db = getDb()
-  const nowSec = Math.floor(Date.now() / 1000)
-  if (nextDueAt === null) {
-    // exhausted all steps
-    db.prepare(`UPDATE dunning_sequences SET step = step + 1, last_email_sent_at = ?, status = 'exhausted', next_email_due_at = NULL WHERE id = ?`).run(nowSec, id)
-  } else {
-    db.prepare(`UPDATE dunning_sequences SET step = step + 1, last_email_sent_at = ?, next_email_due_at = ? WHERE id = ?`).run(nowSec, nextDueAt, id)
-  }
-}
-
-export function cancelDunningSequence(invoiceId: string) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  getDb().prepare(`UPDATE dunning_sequences SET status = 'cancelled', cancelled_at = ? WHERE invoice_id = ?`).run(nowSec, invoiceId)
-}
-
-export function recoverDunningSequence(invoiceId: string) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  getDb().prepare(`UPDATE dunning_sequences SET status = 'recovered', recovered_at = ? WHERE invoice_id = ?`).run(nowSec, invoiceId)
-}
-
-export function saveAlertSettings(userId: string, settings: {
+export async function saveAlertSettings(userId: string, settings: {
   notifyEmail?: string
   resendApiKey?: string
   emailFailedPayments?: boolean
@@ -272,30 +274,153 @@ export function saveAlertSettings(userId: string, settings: {
   emailPaymentRecovered?: boolean
   emailMinAmount?: number
 }) {
-  const db = getDb()
-  const id = `as_${userId}`
-  db.prepare(`
-    INSERT INTO alert_settings (id, user_id, notify_email, resend_api_key,
-      email_failed_payments, email_churn_risk, email_billing_errors,
-      email_payment_recovered, email_min_amount, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
-    ON CONFLICT(user_id) DO UPDATE SET
-      notify_email = COALESCE(excluded.notify_email, notify_email),
-      resend_api_key = COALESCE(excluded.resend_api_key, resend_api_key),
-      email_failed_payments = excluded.email_failed_payments,
-      email_churn_risk = excluded.email_churn_risk,
-      email_billing_errors = excluded.email_billing_errors,
-      email_payment_recovered = excluded.email_payment_recovered,
-      email_min_amount = excluded.email_min_amount,
-      updated_at = strftime('%s','now')
-  `).run(
-    id, userId,
-    settings.notifyEmail ?? null,
-    settings.resendApiKey ? encrypt(settings.resendApiKey) : null,
-    settings.emailFailedPayments !== false ? 1 : 0,
-    settings.emailChurnRisk !== false ? 1 : 0,
-    settings.emailBillingErrors !== false ? 1 : 0,
-    settings.emailPaymentRecovered !== false ? 1 : 0,
-    settings.emailMinAmount ?? 0,
-  )
+  const supabase = await createClient()
+  const { data: existing } = await supabase
+    .from('alert_settings')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  const payload = {
+    user_id: userId,
+    notify_email: settings.notifyEmail ?? null,
+    resend_api_key: settings.resendApiKey ? encrypt(settings.resendApiKey) : null,
+    email_failed_payments: settings.emailFailedPayments !== false,
+    email_churn_risk: settings.emailChurnRisk !== false,
+    email_billing_errors: settings.emailBillingErrors !== false,
+    email_payment_recovered: settings.emailPaymentRecovered !== false,
+    email_min_amount: settings.emailMinAmount ?? 0,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (existing) {
+    await supabase.from('alert_settings').update(payload).eq('id', existing.id)
+  } else {
+    await supabase.from('alert_settings').insert(payload)
+  }
+}
+
+// --- Dunning Sequences ---
+export async function upsertDunningSequence(data: {
+  invoiceId: string
+  userId?: string
+  customerId?: string
+  customerEmail: string
+  customerName?: string
+  amount: number
+  currency?: string
+}) {
+  const supabase = await createClient()
+  const { data: existing } = await supabase
+    .from('dunning_sequences')
+    .select('id')
+    .eq('invoice_id', data.invoiceId)
+    .maybeSingle()
+
+  if (existing) return existing.id
+
+  const now = new Date()
+  const { data: row } = await supabase
+    .from('dunning_sequences')
+    .insert({
+      user_id: data.userId || null,
+      invoice_id: data.invoiceId,
+      customer_id: data.customerId || null,
+      customer_email: data.customerEmail,
+      customer_name: data.customerName || null,
+      amount: data.amount,
+      currency: data.currency || 'USD',
+      status: 'active',
+      step: 0,
+      next_email_due_at: now.toISOString(),
+    })
+    .select('id')
+    .maybeSingle()
+
+  return row?.id ?? null
+}
+
+export async function getDunningSequences(userId?: string, limit = 100) {
+  const supabase = await createClient()
+  let query = supabase
+    .from('dunning_sequences')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (userId) query = query.eq('user_id', userId)
+
+  const { data } = await query
+  return data ?? []
+}
+
+export async function getDunningSequenceDue() {
+  const supabase = createServiceClient()
+  const now = new Date().toISOString()
+  const { data } = await supabase
+    .from('dunning_sequences')
+    .select('*')
+    .eq('status', 'active')
+    .lt('step', 3)
+    .lte('next_email_due_at', now)
+    .order('next_email_due_at', { ascending: true })
+    .limit(50)
+
+  return data ?? []
+}
+
+export async function advanceDunningStep(id: string, nextDueAt: Date | null) {
+  const supabase = await createClient()
+  const now = new Date().toISOString()
+
+  const { data: seq } = await supabase
+    .from('dunning_sequences')
+    .select('step')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!seq) return
+
+  if (nextDueAt === null) {
+    await supabase
+      .from('dunning_sequences')
+      .update({
+        step: seq.step + 1,
+        last_email_sent_at: now,
+        status: 'exhausted',
+        next_email_due_at: null,
+      })
+      .eq('id', id)
+  } else {
+    await supabase
+      .from('dunning_sequences')
+      .update({
+        step: seq.step + 1,
+        last_email_sent_at: now,
+        next_email_due_at: nextDueAt.toISOString(),
+      })
+      .eq('id', id)
+  }
+}
+
+export async function cancelDunningSequence(invoiceId: string) {
+  const supabase = await createClient()
+  await supabase
+    .from('dunning_sequences')
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+    })
+    .eq('invoice_id', invoiceId)
+}
+
+export async function recoverDunningSequence(invoiceId: string) {
+  const supabase = await createClient()
+  await supabase
+    .from('dunning_sequences')
+    .update({
+      status: 'recovered',
+      recovered_at: new Date().toISOString(),
+    })
+    .eq('invoice_id', invoiceId)
 }

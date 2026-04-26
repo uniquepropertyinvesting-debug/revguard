@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const userId = await getVerifiedUserId(req)
     if (!userId) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    const connection = getStripeConnection(userId)
+    const connection = await getStripeConnection(userId)
     if (!connection) return NextResponse.json({ connected: false })
     return NextResponse.json({
       connected: true,
@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, secretKey, publishableKey, webhookSecret } = await req.json()
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? userId
+    const { secretKey, publishableKey, webhookSecret } = await req.json()
+    const verifiedUserId = await getVerifiedUserId(req)
     if (!verifiedUserId || !secretKey) {
       return NextResponse.json({ error: 'userId and secretKey required' }, { status: 400 })
     }
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    saveStripeConnection(verifiedUserId, secretKey, publishableKey, webhookSecret)
+    await saveStripeConnection(verifiedUserId, secretKey, publishableKey, webhookSecret)
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'DB error'

@@ -1,11 +1,5 @@
 "use client"
 
-/**
- * User Menu Component
- *
- * Displays current user info with logout button. Add your own styling.
- */
-
 import { useAuth } from '../hooks/useAuth'
 
 interface UserMenuProps {

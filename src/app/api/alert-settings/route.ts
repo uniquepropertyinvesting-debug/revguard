@@ -6,7 +6,7 @@ import { getVerifiedUserId } from '@/lib/serverAuth'
 export async function GET(req: NextRequest) {
   try {
     const userId = (await getVerifiedUserId(req)) ?? 'default'
-    const settings = getAlertSettings(userId)
+    const settings = await getAlertSettings(userId)
     if (!settings) {
       return NextResponse.json({
         notifyEmail: '',
@@ -36,8 +36,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { userId = 'default', notifyEmail, resendApiKey, ...prefs } = body
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? userId
+    const { notifyEmail, resendApiKey, ...prefs } = body
+    const verifiedUserId = await getVerifiedUserId(req)
 
     // If they're setting a new API key, validate it first
     if (resendApiKey) {
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    saveAlertSettings(verifiedUserId, {
+    await saveAlertSettings(verifiedUserId, {
       notifyEmail,
       resendApiKey: resendApiKey || undefined,
       emailFailedPayments: prefs.emailFailedPayments !== false,
@@ -73,9 +73,8 @@ export async function POST(req: NextRequest) {
 // Send a test email
 export async function PUT(req: NextRequest) {
   try {
-    const { userId = 'default' } = await req.json()
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? userId
-    const settings = getAlertSettings(verifiedUserId)
+    const verifiedUserId = await getVerifiedUserId(req)
+    const settings = await getAlertSettings(verifiedUserId)
     const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
     const toEmail = settings?.notify_email
 

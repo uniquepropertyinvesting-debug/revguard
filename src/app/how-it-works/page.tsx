@@ -161,8 +161,7 @@ export default function HowItWorksPage() {
   const [activeStep, setActiveStep] = useState<number | null>(null)
 
   const handleLogin = () => {
-    // @ts-ignore
-    window.Nxcode?.auth?.login()
+    window.location.href = '/'
   }
 
   return (

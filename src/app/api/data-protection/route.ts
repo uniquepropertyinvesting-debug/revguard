@@ -3,9 +3,9 @@ import { getWebhookEvents, getRecoveryActions, getAlerts } from '@/lib/db'
 
 export async function GET() {
   try {
-    const webhookEvents = getWebhookEvents(undefined, 200)
-    const recoveryActions = getRecoveryActions(undefined, 200)
-    const alerts = getAlerts(undefined, 200)
+    const webhookEvents = await getWebhookEvents(undefined, 200)
+    const recoveryActions = await getRecoveryActions(undefined, 200)
+    const alerts = await getAlerts(undefined, 200)
 
     const now = Math.floor(Date.now() / 1000)
     const oneDayAgo = now - 86400

@@ -29,7 +29,7 @@ function detectErrorType(invoice: {
 
 export async function GET(req: NextRequest) {
   const userId = (await getVerifiedUserId(req)) ?? undefined
-  const stripe = getStripeForUser(userId)
+  const stripe = await getStripeForUser(userId)
   try {
     const allInvoices = await paginate(stripe.invoices.list({ limit: 100 }))
 

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user's alert settings
-    const settings = userId ? getAlertSettings(userId) : null
+    const settings = userId ? await getAlertSettings(userId) : null
 
     // Fall back to env-level Resend key (for single-tenant / demo mode)
     const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
