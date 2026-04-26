@@ -1,10 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { getRecoveryActions } from '@/lib/db'
+import { getVerifiedUserId } from '@/lib/serverAuth'
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get('userId') || undefined
-    const actions = getRecoveryActions(userId, 100)
+    const userId = (await getVerifiedUserId(req)) ?? undefined
+    const actions = await getRecoveryActions(userId, 100)
     const totalRecovered = actions
       .filter((a: any) => a.status === 'success')
       .reduce((sum: number, a: any) => sum + a.amount, 0)

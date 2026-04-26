@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { authFetch, getAuthUserId } from '@/lib/auth'
+import { authFetch } from '@/lib/auth'
 
 interface DunningSequence {
   id: string
@@ -82,7 +82,7 @@ export default function AutomatedDunning() {
       const r = await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'run', userId: getAuthUserId() }),
+        body: JSON.stringify({ action: 'run' }),
       })
       const d = await r.json()
       if (d.error) throw new Error(d.error)
@@ -103,7 +103,7 @@ export default function AutomatedDunning() {
       const r = await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sync', userId: getAuthUserId() }),
+        body: JSON.stringify({ action: 'sync' }),
       })
       const d = await r.json()
       if (d.error) throw new Error(d.error)
@@ -121,7 +121,7 @@ export default function AutomatedDunning() {
       await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel', invoiceId, userId: getAuthUserId() }),
+        body: JSON.stringify({ action: 'cancel', invoiceId }),
       })
       load()
     } catch {}
@@ -135,7 +135,7 @@ export default function AutomatedDunning() {
       const r = await authFetch('/api/dunning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'enroll', invoiceId: enrollInvoiceId.trim(), userId: getAuthUserId() }),
+        body: JSON.stringify({ action: 'enroll', invoiceId: enrollInvoiceId.trim() }),
       })
       const d = await r.json()
       if (d.error) throw new Error(d.error)

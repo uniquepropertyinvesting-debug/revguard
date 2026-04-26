@@ -9,8 +9,8 @@ interface Alert {
   severity: string
   title: string
   message: string
-  read: number
-  created_at: number
+  read: boolean
+  created_at: string
 }
 
 const severityColor: Record<string, string> = {
@@ -27,8 +27,8 @@ const severityIcon: Record<string, string> = {
   info: 'ℹ️',
 }
 
-function timeAgo(ts: number) {
-  const diff = Math.floor((Date.now() / 1000) - ts)
+function timeAgo(ts: string) {
+  const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
   if (diff < 60) return `${diff}s ago`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
@@ -66,13 +66,13 @@ export default function NotificationBell() {
 
   const markAllRead = () => {
     authFetch('/api/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markAllRead: true }) })
-      .then(() => { setAlerts(a => a.map(x => ({ ...x, read: 1 }))); })
+      .then(() => { setAlerts(a => a.map(x => ({ ...x, read: true }))); })
       .catch(() => {})
   }
 
   const markRead = (id: string) => {
     authFetch('/api/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alertId: id }) })
-      .then(() => setAlerts(a => a.map(x => x.id === id ? { ...x, read: 1 } : x)))
+      .then(() => setAlerts(a => a.map(x => x.id === id ? { ...x, read: true } : x)))
       .catch(() => {})
   }
 

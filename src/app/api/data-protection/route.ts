@@ -3,18 +3,16 @@ import { getWebhookEvents, getRecoveryActions, getAlerts } from '@/lib/db'
 
 export async function GET() {
   try {
-    const webhookEvents = getWebhookEvents(undefined, 200)
-    const recoveryActions = getRecoveryActions(undefined, 200)
-    const alerts = getAlerts(undefined, 200)
+    const webhookEvents = await getWebhookEvents(undefined, 200)
+    const recoveryActions = await getRecoveryActions(undefined, 200)
+    const alerts = await getAlerts(undefined, 200)
 
-    const now = Math.floor(Date.now() / 1000)
-    const oneDayAgo = now - 86400
-    const sevenDaysAgo = now - 7 * 86400
+    const now = new Date()
+    const oneDayAgo = new Date(now.getTime() - 86400 * 1000).toISOString()
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86400 * 1000).toISOString()
 
-    // Build a real audit log from DB activity
     const auditLog: any[] = []
 
-    // Webhook events = data ingestion events
     for (const ev of webhookEvents.slice(0, 15)) {
       auditLog.push({
         action: `Stripe webhook received: ${ev.event_type}`,
@@ -24,7 +22,6 @@ export async function GET() {
       })
     }
 
-    // Recovery actions = user-triggered actions
     for (const ra of recoveryActions.slice(0, 10)) {
       auditLog.push({
         action: `Recovery action: ${ra.action} — ${ra.status}`,
@@ -34,11 +31,9 @@ export async function GET() {
       })
     }
 
-    // Sort by time desc, take top 20
-    auditLog.sort((a, b) => b.time - a.time)
+    auditLog.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
     const recentAuditLog = auditLog.slice(0, 20)
 
-    // Data stats
     const eventsLast24h = webhookEvents.filter(e => e.created_at >= oneDayAgo).length
     const eventsLast7d = webhookEvents.filter(e => e.created_at >= sevenDaysAgo).length
     const totalRecoveryActions = recoveryActions.length

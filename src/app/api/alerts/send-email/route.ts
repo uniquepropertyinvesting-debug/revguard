@@ -3,12 +3,10 @@ import { Resend } from 'resend'
 import { getAlertSettings } from '@/lib/db'
 import { rateLimit, rateLimitHeaders } from '@/lib/rateLimit'
 
-// Called internally when a new alert is created — sends email if user has Resend configured
 export async function POST(req: NextRequest) {
   try {
     const { alertType, title, message, amount, userId, severity } = await req.json()
 
-    // 20 alert emails per user per hour — prevents inbox bombing
     const rl = rateLimit('alert-email', userId || 'anon', { max: 20, windowMs: 60 * 60_000 })
     if (!rl.ok) {
       return NextResponse.json(
@@ -17,10 +15,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Get user's alert settings
-    const settings = userId ? getAlertSettings(userId) : null
+    const settings = userId ? await getAlertSettings(userId) : null
 
-    // Fall back to env-level Resend key (for single-tenant / demo mode)
     const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
     const toEmail = settings?.notify_email || process.env.ALERT_EMAIL
 
@@ -28,7 +24,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true, reason: 'No Resend API key or email configured' })
     }
 
-    // Check user preferences
     if (settings) {
       const minAmt = settings.email_min_amount || 0
       if (amount && amount < minAmt) {

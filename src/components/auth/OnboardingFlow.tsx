@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { getAuthUserId } from '@/lib/auth'
+import { authFetch } from '@/lib/auth'
 
 interface User {
   id: string
@@ -66,11 +66,10 @@ export default function OnboardingFlow({ user, onComplete }: OnboardingFlowProps
     setStripeKeyError('')
     setConnecting('stripe')
     try {
-      const userId = getAuthUserId()
-      const res = await fetch('/api/db/stripe-connect', {
+      const res = await authFetch('/api/db/stripe-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, secretKey: key }),
+        body: JSON.stringify({ secretKey: key }),
       })
       const data = await res.json()
       if (data.error) {

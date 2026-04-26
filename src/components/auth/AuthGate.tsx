@@ -1,16 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/modules/auth/hooks/useAuth'
+import { createClient } from '@/lib/supabase/client'
 import LandingPage from '@/components/auth/LandingPage'
 import OnboardingFlow from '@/components/auth/OnboardingFlow'
-
-interface User {
-  id: string
-  email: string
-  name: string | null
-  avatar: string | null
-  balance: number
-}
 
 interface AuthGateProps {
   children: React.ReactNode
@@ -19,47 +13,35 @@ interface AuthGateProps {
 type AppState = 'loading' | 'landing' | 'onboarding' | 'app'
 
 export default function AuthGate({ children }: AuthGateProps) {
-  const [user, setUser] = useState<User | null>(null)
+  const { user, isLoading, isAuthenticated } = useAuth()
   const [state, setState] = useState<AppState>('loading')
 
   useEffect(() => {
-    const checkAuth = () => {
-      // @ts-ignore
-      const sdk = window.Nxcode
-      if (!sdk?.auth) {
-        setTimeout(checkAuth, 300)
-        return
-      }
+    if (isLoading) return
 
-      // Listen for auth changes
-      sdk.auth.onAuthStateChange((u: User | null) => {
-        setUser(u)
-        if (!u) {
-          setState('landing')
-        } else {
-          // Check if onboarding completed
-          const onboarded = localStorage.getItem(`revguard_onboarded_${u.id}`)
-          setState(onboarded ? 'app' : 'onboarding')
-        }
-      })
-
-      // Check current state
-      if (sdk.auth.isLoggedIn()) {
-        const u = sdk.auth.getUser()
-        setUser(u)
-        const onboarded = localStorage.getItem(`revguard_onboarded_${u?.id}`)
-        setState(onboarded ? 'app' : 'onboarding')
-      } else {
-        setState('landing')
-      }
+    if (!isAuthenticated || !user) {
+      setState('landing')
+      return
     }
 
-    checkAuth()
-  }, [])
+    const checkOnboarded = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('users')
+        .select('onboarded')
+        .eq('id', user.id)
+        .maybeSingle()
 
-  const handleOnboardingComplete = () => {
+      setState(data?.onboarded ? 'app' : 'onboarding')
+    }
+
+    checkOnboarded()
+  }, [isLoading, isAuthenticated, user])
+
+  const handleOnboardingComplete = async () => {
     if (user) {
-      localStorage.setItem(`revguard_onboarded_${user.id}`, 'true')
+      const supabase = createClient()
+      await supabase.from('users').update({ onboarded: true }).eq('id', user.id)
     }
     setState('app')
   }
@@ -83,6 +65,6 @@ export default function AuthGate({ children }: AuthGateProps) {
   }
 
   if (state === 'landing') return <LandingPage />
-  if (state === 'onboarding') return <OnboardingFlow user={user} onComplete={handleOnboardingComplete} />
+  if (state === 'onboarding') return <OnboardingFlow user={user ? { id: user.id, email: user.email, name: user.name || null, avatar: user.avatar || null, balance: 0 } : null} onComplete={handleOnboardingComplete} />
   return <>{children}</>
 }

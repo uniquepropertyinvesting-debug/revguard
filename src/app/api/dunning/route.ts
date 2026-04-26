@@ -15,7 +15,6 @@ import {
 import { rateLimit, rateLimitHeaders } from '@/lib/rateLimit'
 import { getVerifiedUserId } from '@/lib/serverAuth'
 
-// Dunning schedule: steps 0→1 (immediate), 1→2 (+3 days), 2→3 (+4 days = day 7)
 const DUNNING_STEPS = [
   {
     step: 1,
@@ -36,7 +35,7 @@ const DUNNING_STEPS = [
     day: 7,
     subject: 'Final Notice: Service suspension in 48 hours',
     urgency: 'high',
-    nextOffsetDays: null, // exhausted after this
+    nextOffsetDays: null,
   },
 ]
 
@@ -170,8 +169,8 @@ function buildDunningEmail(params: {
 export async function GET(req: NextRequest) {
   try {
     const userId = (await getVerifiedUserId(req)) ?? undefined
-    const sequences = getDunningSequences(userId, 200)
-    const now = Math.floor(Date.now() / 1000)
+    const sequences = await getDunningSequences(userId, 200)
+    const now = new Date().toISOString()
 
     const stats = {
       total: sequences.length,
@@ -195,10 +194,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { action, invoiceId, userId } = body
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? userId
+    const { action, invoiceId } = body
+    const verifiedUserId = (await getVerifiedUserId(req)) ?? undefined
 
-    // 30 dunning actions per user per minute
     const rl = rateLimit('dunning', verifiedUserId || req.ip || 'anon', { max: 30, windowMs: 60_000 })
     if (!rl.ok) {
       return NextResponse.json(
@@ -207,14 +205,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Use the tenant's Stripe instance
-    const stripe = getStripeForUser(verifiedUserId)
+    const stripe = await getStripeForUser(verifiedUserId)
 
     // --- ENROLL: add a specific invoice to dunning ---
     if (action === 'enroll') {
       if (!invoiceId) return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
 
-      // Fetch invoice from Stripe
       const invoice = await stripe.invoices.retrieve(invoiceId)
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id || ''
       let customerEmail = invoice.customer_email || ''
@@ -234,7 +230,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Customer email not found on invoice' }, { status: 400 })
       }
 
-      upsertDunningSequence({
+      await upsertDunningSequence({
         invoiceId,
         userId: verifiedUserId,
         customerId,
@@ -250,27 +246,26 @@ export async function POST(req: NextRequest) {
     // --- CANCEL: remove from dunning ---
     if (action === 'cancel') {
       if (!invoiceId) return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
-      cancelDunningSequence(invoiceId)
+      await cancelDunningSequence(invoiceId)
       return NextResponse.json({ success: true })
     }
 
     // --- MARK_RECOVERED: stop dunning for a paid invoice ---
     if (action === 'mark_recovered') {
       if (!invoiceId) return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
-      recoverDunningSequence(invoiceId)
+      await recoverDunningSequence(invoiceId)
       return NextResponse.json({ success: true })
     }
 
     // --- RUN: process all due emails ---
     if (action === 'run' || !action) {
-      const due = getDunningSequenceDue()
+      const due = await getDunningSequenceDue()
 
       if (due.length === 0) {
         return NextResponse.json({ processed: 0, message: 'No sequences due' })
       }
 
-      // Get Resend config
-      const settings = verifiedUserId ? getAlertSettings(verifiedUserId) : getAlertSettings('default')
+      const settings = verifiedUserId ? await getAlertSettings(verifiedUserId) : await getAlertSettings('default')
       const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
       const threadId = process.env.THREAD_ID || '4e8b8e4b-dc75-44f2-8684-56cf03492cc9'
       const dashboardUrl = `https://${threadId}.studio-api.nxcode.io/`
@@ -282,9 +277,8 @@ export async function POST(req: NextRequest) {
         const stepConfig = DUNNING_STEPS[nextStep - 1]
         if (!stepConfig) continue
 
-        const nowSec = Math.floor(Date.now() / 1000)
         const nextDueAt = stepConfig.nextOffsetDays
-          ? nowSec + stepConfig.nextOffsetDays * 86400
+          ? new Date(Date.now() + stepConfig.nextOffsetDays * 86400 * 1000).toISOString()
           : null
 
         let emailSent = false
@@ -320,11 +314,9 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Advance the sequence regardless (log it)
-        advanceDunningStep(seq.id, nextDueAt)
+        await advanceDunningStep(seq.id, nextDueAt)
 
-        // Log recovery action
-        logRecoveryAction({
+        await logRecoveryAction({
           userId: seq.user_id,
           invoiceId: seq.invoice_id,
           customerId: seq.customer_id,
@@ -338,7 +330,7 @@ export async function POST(req: NextRequest) {
             : `Day ${stepConfig.day} dunning step logged (no email: ${emailError || 'no Resend key'})`,
         })
 
-        createAlert({
+        await createAlert({
           userId: seq.user_id,
           type: 'dunning_email',
           severity: nextStep === 3 ? 'critical' : 'warning',
@@ -387,7 +379,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (customerEmail) {
-          upsertDunningSequence({
+          await upsertDunningSequence({
             invoiceId: inv.id,
             userId: verifiedUserId,
             customerId,
