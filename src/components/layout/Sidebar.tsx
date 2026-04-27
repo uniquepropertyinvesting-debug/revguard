@@ -24,6 +24,7 @@ const NAV_GROUPS_BASE = [
     label: 'OVERVIEW',
     items: [
       { id: 'command-center', label: 'Command Center', icon: '⚡', badge: 'LIVE' },
+      { id: 'live-feed', label: 'Live Feed', icon: '📡', badge: 'LIVE' },
     ]
   },
   {
@@ -51,9 +52,10 @@ const NAV_GROUPS_BASE = [
     ]
   },
   {
-    label: 'CUSTOMERS & PLATFORM',
+    label: 'AUTOMATION & PLATFORM',
     items: [
-      { id: 'ai-assistant', label: 'AI Revenue Assistant', icon: '🤖', badge: 'AI' },
+      { id: 'n8n-automation', label: 'n8n Automation', icon: '🤖', badge: 'NEW' },
+      { id: 'ai-assistant', label: 'AI Revenue Assistant', icon: '💬', badge: 'AI' },
       { id: 'integrations', label: 'Integrations', icon: '🔗' },
       { id: 'data-protection', label: 'Data Protection', icon: '🔒' },
       { id: 'alert-settings', label: 'Alert Settings', icon: '📧' },
