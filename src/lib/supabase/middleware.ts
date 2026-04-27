@@ -30,7 +30,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (request.nextUrl.pathname.startsWith('/api/')) {
-    const publicRoutes = ['/api/webhooks/stripe', '/api/auth/']
+    const publicRoutes = ['/api/webhooks/stripe', '/api/auth/', '/api/alerts/send-email']
     if (!publicRoutes.some((r) => request.nextUrl.pathname.startsWith(r))) {
       if (!user) {
         return NextResponse.json(

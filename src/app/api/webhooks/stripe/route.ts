@@ -8,8 +8,11 @@ async function sendAlertEmail(alertType: string, title: string, message: string,
     const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'
     await fetch(`${base}/api/alerts/send-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ alertType, title, message, severity, amount, internalKey: process.env.SUPABASE_SERVICE_ROLE_KEY }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-key': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      },
+      body: JSON.stringify({ alertType, title, message, severity, amount }),
     })
   } catch { /* email is best-effort */ }
 }

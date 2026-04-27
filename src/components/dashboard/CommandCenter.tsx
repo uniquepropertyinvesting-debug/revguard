@@ -7,8 +7,9 @@ function fmt(n: number) {
 }
 
 export default function CommandCenter() {
-  const { data: overview, loading: ovLoading } = useStripeOverview()
-  const { data: failed, loading: failLoading } = useStripeFailedPayments()
+  const { data: overview, loading: ovLoading, error: ovError } = useStripeOverview()
+  const { data: failed, loading: failLoading, error: failError } = useStripeFailedPayments()
+  const dataError = ovError || failError
 
   const kpiCards = [
     {
@@ -45,6 +46,24 @@ export default function CommandCenter() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+      {dataError && (
+        <div style={{
+          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+          borderRadius: '10px', padding: '16px 20px',
+          display: 'flex', alignItems: 'center', gap: '12px'
+        }}>
+          <span style={{ fontSize: '20px' }}>&#9888;</span>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '2px' }}>
+              Unable to load Stripe data
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              {dataError} -- Check that your Stripe key is connected in Integrations.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header Banner */}
       <div style={{
