@@ -1,6 +1,8 @@
 'use client'
 
 import { useStripeOverview, useStripeFailedPayments } from '@/lib/useStripe'
+import AiInsightsPanel from '@/components/ai/AiInsightsPanel'
+import AiExplainButton from '@/components/ai/AiExplainButton'
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -88,6 +90,9 @@ export default function CommandCenter() {
         </div>
       </div>
 
+      {/* AI Analysis */}
+      <AiInsightsPanel />
+
       {/* KPI Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {kpiCards.map((card, i) => (
@@ -126,7 +131,10 @@ export default function CommandCenter() {
               <div className="pulse-dot" style={{ background: '#ef4444' }} />
               <span style={{ fontWeight: 700, fontSize: '14px' }}>Failed Payments</span>
             </div>
-            <span className="badge-red">{failLoading ? '...' : `${failed.length} Failed`}</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <AiExplainButton topic={`Why are payments failing? I have ${failed.length} failed payments totaling $${failed.reduce((s: number, p: any) => s + p.amount, 0).toFixed(0)}. What are the main failure reasons and what should I do?`} />
+              <span className="badge-red">{failLoading ? '...' : `${failed.length} Failed`}</span>
+            </div>
           </div>
           <div>
             {failLoading ? (
@@ -165,7 +173,10 @@ export default function CommandCenter() {
         <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, fontSize: '14px' }}>Subscription Health</span>
-            <span className="badge-green">Live</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <AiExplainButton topic={`Analyze my subscription health: ${overview?.activeSubscriptions ?? 0} active, ${overview?.pastDueSubscriptions ?? 0} past due, ${overview?.canceledSubscriptions ?? 0} canceled. MRR is $${(overview?.mrr ?? 0).toFixed(0)}. Is this healthy?`} />
+              <span className="badge-green">Live</span>
+            </div>
           </div>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {ovLoading ? (

@@ -18,6 +18,7 @@ import AlertSettings from '@/components/dashboard/AlertSettings'
 import AutomatedDunning from '@/components/dashboard/AutomatedDunning'
 import LiveFeed from '@/components/dashboard/LiveFeed'
 import N8nAutomation from '@/components/dashboard/N8nAutomation'
+import RevenueAnalyzer from '@/components/dashboard/RevenueAnalyzer'
 import Pricing from '@/components/dashboard/Pricing'
 import Sidebar from '@/components/layout/Sidebar'
 import TopBar from '@/components/layout/TopBar'
@@ -41,6 +42,7 @@ export type Section =
   | 'automated-dunning'
   | 'live-feed'
   | 'n8n-automation'
+  | 'revenue-analyzer'
   | 'pricing'
 
 function Dashboard() {
@@ -73,6 +75,7 @@ function Dashboard() {
       case 'automated-dunning': return <AutomatedDunning />
       case 'live-feed':         return <LiveFeed />
       case 'n8n-automation':    return <N8nAutomation />
+      case 'revenue-analyzer':  return <RevenueAnalyzer />
       case 'pricing':           return <Pricing />
       default:                  return <CommandCenter />
     }

@@ -31,6 +31,7 @@ const NAV_GROUPS_BASE = [
     label: 'REVENUE INTELLIGENCE',
     items: [
       { id: 'revenue-loss-intel', label: 'Revenue Loss Intel', icon: '🔍' },
+      { id: 'revenue-analyzer', label: 'AI Analyzer', icon: '✦', badge: 'AI' },
       { id: 'roi-engine', label: 'ROI Engine', icon: '📈' },
     ]
   },

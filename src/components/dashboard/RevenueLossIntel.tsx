@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { authFetch } from '@/lib/auth'
+import AiExplainButton from '@/components/ai/AiExplainButton'
 
 interface IntelData {
   mrr: number
@@ -139,7 +140,10 @@ export default function RevenueLossIntel() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
       }}>
         <div>
-          <div style={{ fontSize: '20px', fontWeight: 800 }}>Revenue Intelligence Report</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ fontSize: '20px', fontWeight: 800 }}>Revenue Intelligence Report</div>
+            <AiExplainButton topic={`Give me an executive summary of my revenue health. Total leakage is $${data.totalLeakage.toFixed(0)} across failed payments ($${data.failedRevenue.toFixed(0)}), churn risk ($${data.mrrAtRisk.toFixed(0)}), billing errors ($${data.billingErrorImpact.toFixed(0)}), and usage mismatch ($${data.usageMismatchImpact.toFixed(0)}). Recovery rate is ${data.recoveryRate}%. What should I prioritize?`} label="AI Summary" />
+          </div>
           <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
             Live Stripe data · Updated in real-time
           </div>
