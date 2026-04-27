@@ -226,6 +226,35 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--accent-blue);
 }
 
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: var(--accent-blue);
+  outline: 2px solid rgba(59, 130, 246, 0.4);
+  outline-offset: 1px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+.btn-primary:disabled, .btn-secondary:disabled, .btn-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-primary:disabled:hover {
+  opacity: 0.45;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-secondary:disabled:hover {
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

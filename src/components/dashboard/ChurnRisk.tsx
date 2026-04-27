@@ -82,7 +82,7 @@ export default function ChurnRisk() {
           <button onClick={() => setSortBy('mrr')} className={sortBy === 'mrr' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '13px', padding: '7px 14px' }}>
             Sort by MRR
           </button>
-          <button className="btn-primary">🛡️ Auto-Intervene High Risk</button>
+          <button className="btn-primary" disabled={!data || summary.highRisk === 0} title={summary.highRisk === 0 ? 'No high-risk accounts' : 'Navigate to Churn Intervention for action plans'}>Auto-Intervene High Risk</button>
         </div>
       </div>
 

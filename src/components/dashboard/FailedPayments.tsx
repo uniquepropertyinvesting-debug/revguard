@@ -72,7 +72,7 @@ export default function FailedPayments() {
               </button>
             </>
           )}
-          <button className="btn-primary">+ Smart Retry All</button>
+          <button className="btn-primary" disabled={loading || failedPayments.length === 0}>Smart Retry All</button>
         </div>
       </div>
 

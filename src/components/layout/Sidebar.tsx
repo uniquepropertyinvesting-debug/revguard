@@ -78,10 +78,11 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
   useEffect(() => {
     const fetchCounts = async () => {
       try {
+        const safeJson = (r: Response) => r.ok ? r.json() : Promise.resolve({})
         const [overview, billing, churn] = await Promise.all([
-          authFetch('/api/stripe/overview').then(r => r.json()).catch(() => ({})),
-          authFetch('/api/stripe/billing-errors').then(r => r.json()).catch(() => ({})),
-          authFetch('/api/stripe/churn-risk').then(r => r.json()).catch(() => ({})),
+          authFetch('/api/stripe/overview').then(safeJson).catch(() => ({})),
+          authFetch('/api/stripe/billing-errors').then(safeJson).catch(() => ({})),
+          authFetch('/api/stripe/churn-risk').then(safeJson).catch(() => ({})),
         ])
         setAlertCounts({
           failedCount: overview.failedCount || 0,
@@ -150,6 +151,7 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
                   key={item.id}
                   className={`sidebar-link ${activeSection === item.id ? 'active' : ''}`}
                   onClick={() => setActiveSection(item.id as Section)}
+                  aria-current={activeSection === item.id ? 'page' : undefined}
                 >
                   <span style={{ fontSize: '16px' }}>{item.icon}</span>
                   <span style={{ flex: 1 }}>{item.label}</span>
@@ -159,11 +161,14 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
                     </span>
                   )}
                   {liveCount > 0 && (
-                    <span style={{
-                      background: '#ef4444', color: 'white',
-                      borderRadius: '10px', padding: '1px 6px',
-                      fontSize: '10px', fontWeight: 700
-                    }}>{liveCount}</span>
+                    <span
+                      aria-label={`${liveCount} alerts`}
+                      style={{
+                        background: '#ef4444', color: 'white',
+                        borderRadius: '10px', padding: '1px 6px',
+                        fontSize: '10px', fontWeight: 700
+                      }}
+                    >{liveCount}</span>
                   )}
                 </button>
               )

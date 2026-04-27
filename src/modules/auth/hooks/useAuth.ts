@@ -93,7 +93,11 @@ export function useAuthProvider(): AuthContextType {
 
   const logout = useCallback(async () => {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // signOut can fail on network issues; clear local state regardless
+    }
     setUser(null)
   }, [])
 

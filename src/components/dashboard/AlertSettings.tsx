@@ -51,7 +51,7 @@ export default function AlertSettings() {
 
   useEffect(() => {
     authFetch('/api/alert-settings')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`Failed (${r.status})`); return r.json() })
       .then(d => { if (!d.error) setSettings(d) })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -67,6 +67,7 @@ export default function AlertSettings() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      if (!r.ok) throw new Error(`Save failed (${r.status})`)
       const d = await r.json()
       if (d.error) throw new Error(d.error)
       setStatus({ type: 'success', msg: 'Settings saved!' })
@@ -89,6 +90,7 @@ export default function AlertSettings() {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
+      if (!r.ok) throw new Error(`Test failed (${r.status})`)
       const d = await r.json()
       if (d.error) throw new Error(d.error)
       setStatus({ type: 'success', msg: `Test email sent to ${settings.notifyEmail}!` })

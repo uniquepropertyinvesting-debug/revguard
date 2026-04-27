@@ -68,7 +68,7 @@ export default function BillingErrors() {
             </button>
           ))}
         </div>
-        <button className="btn-primary">🔍 Run Billing Audit</button>
+        <button className="btn-primary" disabled={loading || !!error} title="Refreshes billing error data">Run Billing Audit</button>
       </div>
 
       {/* Error Cards */}
