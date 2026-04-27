@@ -18,16 +18,22 @@ interface IntelData {
   recoveryRate: string
 }
 
+function checkedJson(r: Response) {
+  if (!r.ok) throw new Error(`Request failed (${r.status})`)
+  return r.json()
+}
+
 export default function RevenueLossIntel() {
   const [data, setData] = useState<IntelData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
-      authFetch('/api/stripe/overview').then(r => r.json()),
-      authFetch('/api/stripe/churn-risk').then(r => r.json()),
-      authFetch('/api/stripe/billing-errors').then(r => r.json()),
-      authFetch('/api/stripe/usage-mismatch').then(r => r.json()),
+      authFetch('/api/stripe/overview').then(checkedJson),
+      authFetch('/api/stripe/churn-risk').then(checkedJson),
+      authFetch('/api/stripe/billing-errors').then(checkedJson),
+      authFetch('/api/stripe/usage-mismatch').then(checkedJson),
     ]).then(([overview, churn, billing, usage]) => {
       const failedRevenue = overview.failedRevenue || 0
       const mrrAtRisk = churn.summary?.mrrAtRisk || 0
@@ -49,12 +55,20 @@ export default function RevenueLossIntel() {
         totalLeakage,
         recoveryRate: overview.recoveryRate || '0',
       })
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch((e) => setError(e.message || 'Failed to load intelligence data')).finally(() => setLoading(false))
   }, [])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px', color: 'var(--text-muted)' }}>
       Loading revenue intelligence...
+    </div>
+  )
+
+  if (error) return (
+    <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
+      <div style={{ fontSize: '28px', marginBottom: '12px' }}>&#9888;</div>
+      <div style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444', marginBottom: '6px' }}>Unable to load revenue intelligence</div>
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{error}</div>
     </div>
   )
 

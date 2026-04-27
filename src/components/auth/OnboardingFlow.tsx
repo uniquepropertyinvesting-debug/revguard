@@ -71,6 +71,11 @@ export default function OnboardingFlow({ user, onComplete }: OnboardingFlowProps
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ secretKey: key }),
       })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `Connection failed (${res.status})` }))
+        setStripeKeyError(errData.error || `Connection failed (${res.status})`)
+        return
+      }
       const data = await res.json()
       if (data.error) {
         setStripeKeyError(data.error)

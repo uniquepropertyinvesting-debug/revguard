@@ -8,8 +8,11 @@ export async function POST(req: NextRequest) {
   try {
     const { invoiceId } = await req.json()
     const verifiedUserId = (await getVerifiedUserId(req)) ?? undefined
-    if (!invoiceId) {
+    if (!invoiceId || typeof invoiceId !== 'string') {
       return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
+    }
+    if (!invoiceId.startsWith('in_') || invoiceId.length < 10 || invoiceId.length > 255) {
+      return NextResponse.json({ error: 'Invalid invoice ID format' }, { status: 400 })
     }
 
     // 10 retries per user per minute — prevents Stripe fee abuse

@@ -40,17 +40,17 @@ export default function ChurnIntervention() {
   const [tab, setTab] = useState<'active' | 'playbooks'>('active')
   const [accounts, setAccounts] = useState<ChurnAccount[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     authFetch('/api/stripe/churn-risk')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`Request failed (${r.status})`); return r.json() })
       .then(d => {
         if (Array.isArray(d.risks)) {
-          // Only show accounts that actually need intervention (score >= 50 OR cancel at period end)
           setAccounts(d.risks.filter((r: ChurnAccount) => r.score >= 50 || r.cancelAtPeriodEnd || r.status === 'past_due'))
         }
       })
-      .catch(() => {})
+      .catch((e) => setError(e.message || 'Failed to load churn data'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -126,7 +126,13 @@ export default function ChurnIntervention() {
 
       {tab === 'active' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {loading && (
+          {error && (
+            <div className="card" style={{ padding: '24px', textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', color: '#ef4444', marginBottom: '4px' }}>{error}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Check that your Stripe key is connected.</div>
+            </div>
+          )}
+          {loading && !error && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading churn risk data...</div>
           )}
           {!loading && accounts.length === 0 && (

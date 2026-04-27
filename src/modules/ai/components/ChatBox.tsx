@@ -53,13 +53,13 @@ export function ChatBox({
     // Notify parent about new message (for persistence)
     onMessage?.(userMessage)
 
+    let fullContent = ''
     try {
       const chatMessages: ChatMessage[] = [
         { role: 'system', content: systemPrompt },
         ...newMessages
       ]
 
-      let fullContent = ''
       await chatStream({ messages: chatMessages, model }, (chunk) => {
         fullContent += chunk.content
         setStreamingContent(fullContent)
@@ -69,12 +69,15 @@ export function ChatBox({
           setMessages([...newMessages, assistantMessage])
           setStreamingContent('')
 
-          // Notify parent about AI response (for persistence)
           onMessage?.(assistantMessage)
         }
       })
     } catch {
-      // Error is handled by useAI hook
+      if (fullContent) {
+        const partialMsg: ChatMessage = { role: 'assistant', content: fullContent + '\n\n[Response interrupted]' }
+        setMessages([...newMessages, partialMsg])
+      }
+      setStreamingContent('')
     }
   }
 
