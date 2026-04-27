@@ -79,6 +79,13 @@ export function useAuthProvider(): AuthContextType {
     })
     if (error) throw error
     if (!data.user) throw new Error('Signup failed')
+
+    await supabase.from('users').upsert({
+      id: data.user.id,
+      email,
+      name: name || null,
+    }, { onConflict: 'id' })
+
     const mapped = mapUser(data.user)
     setUser(mapped)
     return mapped

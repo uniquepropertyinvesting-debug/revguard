@@ -265,10 +265,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ processed: 0, message: 'No sequences due' })
       }
 
-      const settings = verifiedUserId ? await getAlertSettings(verifiedUserId) : await getAlertSettings('default')
+      const settings = verifiedUserId ? await getAlertSettings(verifiedUserId) : null
       const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
-      const threadId = process.env.THREAD_ID || '4e8b8e4b-dc75-44f2-8684-56cf03492cc9'
-      const dashboardUrl = `https://${threadId}.studio-api.nxcode.io/`
+      const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'
 
       const results: any[] = []
 

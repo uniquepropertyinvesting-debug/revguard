@@ -12,7 +12,8 @@ async function paginate<T>(iter: AsyncIterable<T>, maxItems = 2000): Promise<T[]
 }
 
 export async function GET(req: NextRequest) {
-  const userId = (await getVerifiedUserId(req)) ?? undefined
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const stripe = await getStripeForUser(userId)
   try {
     const [charges, invoices, customers] = await Promise.all([

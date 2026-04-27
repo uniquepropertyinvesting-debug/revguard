@@ -25,14 +25,35 @@ export default function AuthGate({ children }: AuthGateProps) {
     }
 
     const checkOnboarded = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('users')
-        .select('onboarded')
-        .eq('id', user.id)
-        .maybeSingle()
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('users')
+          .select('onboarded')
+          .eq('id', user.id)
+          .maybeSingle()
 
-      setState(data?.onboarded ? 'app' : 'onboarding')
+        if (error) {
+          console.error('Failed to check onboarding status:', error.message)
+          setState('onboarding')
+          return
+        }
+
+        if (!data) {
+          await supabase.from('users').upsert({
+            id: user.id,
+            email: user.email,
+            name: user.name || null,
+          }, { onConflict: 'id' })
+          setState('onboarding')
+          return
+        }
+
+        setState(data.onboarded ? 'app' : 'onboarding')
+      } catch (err) {
+        console.error('Onboarding check failed:', err)
+        setState('onboarding')
+      }
     }
 
     checkOnboarded()

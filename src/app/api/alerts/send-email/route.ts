@@ -5,7 +5,11 @@ import { rateLimit, rateLimitHeaders } from '@/lib/rateLimit'
 
 export async function POST(req: NextRequest) {
   try {
-    const { alertType, title, message, amount, userId, severity } = await req.json()
+    const { alertType, title, message, amount, userId, severity, internalKey } = await req.json()
+
+    if (internalKey !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const rl = rateLimit('alert-email', userId || 'anon', { max: 20, windowMs: 60 * 60_000 })
     if (!rl.ok) {

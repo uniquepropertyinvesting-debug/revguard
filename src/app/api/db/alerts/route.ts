@@ -3,8 +3,10 @@ import { getAlerts, markAlertRead, getUnreadAlertCount } from '@/lib/db'
 import { getVerifiedUserId } from '@/lib/serverAuth'
 
 export async function GET(req: NextRequest) {
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
-    const userId = (await getVerifiedUserId(req)) ?? undefined
     const alerts = await getAlerts(userId, 50)
     const unread = await getUnreadAlertCount(userId)
     return NextResponse.json({ alerts, unread })
@@ -15,6 +17,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
     const { id } = await req.json()
     await markAlertRead(id)

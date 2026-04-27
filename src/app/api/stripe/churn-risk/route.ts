@@ -55,7 +55,8 @@ function churnSignals(sub: {
 }
 
 export async function GET(req: NextRequest) {
-  const userId = (await getVerifiedUserId(req)) ?? undefined
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const stripe = await getStripeForUser(userId)
   try {
     const [subscriptions, customers] = await Promise.all([

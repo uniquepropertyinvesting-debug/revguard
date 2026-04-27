@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripeForUser } from '@/lib/stripe'
+import { getVerifiedUserId } from '@/lib/serverAuth'
+import Stripe from 'stripe'
 
-async function getStripeContext(): Promise<string> {
+async function getStripeContext(stripe: Stripe): Promise<string> {
   try {
     const [charges, subscriptions, customers, invoices] = await Promise.all([
       stripe.charges.list({ limit: 50 }),
@@ -32,7 +34,6 @@ async function getStripeContext(): Promise<string> {
       ? ((succeededCharges.length / recentCharges.length) * 100).toFixed(1)
       : '0'
 
-    // Churn risk scoring
     const customerMap = new Map(customers.data.map(c => [c.id, c]))
     const churnRisks = subscriptions.data
       .filter(s => ['active', 'past_due', 'unpaid'].includes(s.status))
@@ -59,13 +60,11 @@ async function getStripeContext(): Promise<string> {
     const highRisk = churnRisks.filter(r => r.score >= 75)
     const mrrAtRisk = churnRisks.filter(r => r.score >= 50).reduce((sum, r) => sum + r.mrr, 0)
 
-    // Billing errors
     const openFailedInvoices = invoices.data.filter(i => i.status === 'open' && i.attempt_count > 1)
     const uncollectible = invoices.data.filter(i => i.status === 'uncollectible')
     const billingErrorImpact = [...openFailedInvoices, ...uncollectible]
       .reduce((sum, i) => sum + (i.amount_due || 0), 0) / 100
 
-    // Top failed payments
     const topFailed = failedCharges.slice(0, 5).map(c => ({
       amount: (c.amount / 100).toFixed(2),
       reason: c.failure_message || 'declined',
@@ -90,7 +89,7 @@ async function getStripeContext(): Promise<string> {
 - Top failures: ${topFailed.map(f => `$${f.amount} (${f.reason})`).join(', ') || 'none'}
 
 ### Churn Risk
-- High risk accounts (score ≥75): ${highRisk.length}
+- High risk accounts (score >= 75): ${highRisk.length}
 - MRR at risk: $${mrrAtRisk.toFixed(2)}
 - Top at-risk: ${highRisk.slice(0, 3).map(r => `${r.name} (score:${r.score}, $${r.mrr}/mo)`).join(', ') || 'none'}
 
@@ -99,21 +98,28 @@ async function getStripeContext(): Promise<string> {
 - Uncollectible invoices: ${uncollectible.length}
 - Total billing error impact: $${billingErrorImpact.toFixed(2)}
 `.trim()
-  } catch (err) {
+  } catch {
     return '## Stripe data unavailable — answer based on general SaaS revenue best practices.'
   }
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
     const { messages } = await req.json()
     if (!Array.isArray(messages)) {
       return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
 
-    const stripeContext = await getStripeContext()
+    const stripe = await getStripeForUser(userId)
+    const stripeContext = await getStripeContext(stripe)
 
-    const openaiApiKey = process.env.OPENAI_API_KEY || ''
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    if (!openaiApiKey) {
+      return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
+    }
 
     const systemPrompt = `You are RevGuard AI, an expert Revenue Loss Prevention assistant for SaaS companies.\nYou have access to LIVE Stripe data for this account. Use it to give specific, accurate, actionable answers.\nBe concise but highly specific — reference exact numbers from the data below.\nSuggest concrete next steps. Use markdown formatting (bold, bullet points) in responses.\n\n${stripeContext}`
 
@@ -135,8 +141,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (!res.ok) {
-      const err = await res.text()
-      return NextResponse.json({ error: err }, { status: 500 })
+      return NextResponse.json({ error: 'AI request failed' }, { status: 502 })
     }
 
     const data = await res.json()

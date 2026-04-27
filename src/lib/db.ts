@@ -36,14 +36,20 @@ export async function isUserOnboarded(userId: string): Promise<boolean> {
 // --- Stripe Connections (multi-tenant) ---
 export async function saveStripeConnection(userId: string, secretKey: string, publishableKey?: string, webhookSecret?: string) {
   const db = serviceDb()
-  const id = `sc_${userId}`
-  await db.from('stripe_connections').upsert({
-    id,
+  const { data: existing } = await db.from('stripe_connections').select('id').eq('user_id', userId).maybeSingle()
+
+  const row = {
     user_id: userId,
     stripe_secret_key: encrypt(secretKey),
     stripe_publishable_key: publishableKey ? encrypt(publishableKey) : null,
     webhook_secret: webhookSecret ? encrypt(webhookSecret) : null,
-  }, { onConflict: 'id' })
+  }
+
+  if (existing) {
+    await db.from('stripe_connections').update(row).eq('id', existing.id)
+  } else {
+    await db.from('stripe_connections').insert(row)
+  }
 }
 
 export async function getStripeConnection(userId: string) {
@@ -61,16 +67,14 @@ export async function getStripeConnection(userId: string) {
 // --- Webhook Events ---
 export async function saveWebhookEvent(stripeEventId: string, eventType: string, payload: any, userId?: string) {
   const db = serviceDb()
-  const id = `wh_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  const { error } = await db.from('webhook_events').insert({
-    id,
+  const { data, error } = await db.from('webhook_events').insert({
     user_id: userId || null,
     event_type: eventType,
     stripe_event_id: stripeEventId,
     payload,
-  })
+  }).select('id').maybeSingle()
   if (error) return null
-  return id
+  return data?.id
 }
 
 export async function getWebhookEvents(userId?: string, limit = 50) {
@@ -94,9 +98,7 @@ export async function logRecoveryAction(data: {
   result?: string
 }) {
   const db = serviceDb()
-  const id = `ra_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  await db.from('recovery_actions').insert({
-    id,
+  const { data: row } = await db.from('recovery_actions').insert({
     user_id: data.userId || null,
     invoice_id: data.invoiceId,
     customer_id: data.customerId || null,
@@ -106,8 +108,8 @@ export async function logRecoveryAction(data: {
     action: data.action,
     status: data.status,
     result: data.result || null,
-  })
-  return id
+  }).select('id').maybeSingle()
+  return row?.id
 }
 
 export async function getRecoveryActions(userId?: string, limit = 100) {
@@ -128,17 +130,15 @@ export async function createAlert(data: {
   metadata?: any
 }) {
   const db = serviceDb()
-  const id = `al_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  await db.from('alerts').insert({
-    id,
+  const { data: row } = await db.from('alerts').insert({
     user_id: data.userId || null,
     type: data.type,
     severity: data.severity,
     title: data.title,
     message: data.message,
     metadata: data.metadata || null,
-  })
-  return id
+  }).select('id').maybeSingle()
+  return row?.id
 }
 
 export async function getAlerts(userId?: string, limit = 50) {
@@ -171,16 +171,14 @@ export async function createIntervention(data: {
   notes?: string
 }) {
   const db = serviceDb()
-  const id = `int_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  await db.from('interventions').insert({
-    id,
+  const { data: row } = await db.from('interventions').insert({
     user_id: data.userId || null,
     customer_id: data.customerId,
     customer_email: data.customerEmail || null,
     type: data.type,
     notes: data.notes || null,
-  })
-  return id
+  }).select('id').maybeSingle()
+  return row?.id
 }
 
 export async function getInterventions(userId?: string, limit = 50) {
@@ -193,7 +191,7 @@ export async function getInterventions(userId?: string, limit = 50) {
 
 // --- Alert Settings ---
 export async function getAlertSettings(userId: string) {
-  const db = await authDb()
+  const db = serviceDb()
   const { data: row } = await db.from('alert_settings').select('*').eq('user_id', userId).maybeSingle()
   if (!row) return null
   return {
@@ -212,9 +210,9 @@ export async function saveAlertSettings(userId: string, settings: {
   emailMinAmount?: number
 }) {
   const db = serviceDb()
-  const id = `as_${userId}`
-  await db.from('alert_settings').upsert({
-    id,
+  const { data: existing } = await db.from('alert_settings').select('id').eq('user_id', userId).maybeSingle()
+
+  const row = {
     user_id: userId,
     notify_email: settings.notifyEmail ?? null,
     resend_api_key: settings.resendApiKey ? encrypt(settings.resendApiKey) : undefined,
@@ -223,7 +221,13 @@ export async function saveAlertSettings(userId: string, settings: {
     email_billing_errors: settings.emailBillingErrors !== false,
     email_payment_recovered: settings.emailPaymentRecovered !== false,
     email_min_amount: settings.emailMinAmount ?? 0,
-  }, { onConflict: 'user_id' })
+  }
+
+  if (existing) {
+    await db.from('alert_settings').update(row).eq('id', existing.id)
+  } else {
+    await db.from('alert_settings').insert(row)
+  }
 }
 
 // --- Dunning Sequences ---
@@ -237,10 +241,12 @@ export async function upsertDunningSequence(data: {
   currency?: string
 }) {
   const db = serviceDb()
-  const id = `ds_${data.invoiceId}`
   const now = new Date().toISOString()
-  const { error } = await db.from('dunning_sequences').upsert({
-    id,
+
+  const { data: existing } = await db.from('dunning_sequences').select('id').eq('invoice_id', data.invoiceId).maybeSingle()
+  if (existing) return existing.id
+
+  const { data: row, error } = await db.from('dunning_sequences').insert({
     user_id: data.userId || null,
     invoice_id: data.invoiceId,
     customer_id: data.customerId || null,
@@ -251,9 +257,9 @@ export async function upsertDunningSequence(data: {
     status: 'active',
     step: 0,
     next_email_due_at: now,
-  }, { onConflict: 'invoice_id', ignoreDuplicates: true })
+  }).select('id').maybeSingle()
   if (error) console.error('[upsertDunningSequence]', error.message)
-  return id
+  return row?.id
 }
 
 export async function getDunningSequences(userId?: string, limit = 100) {

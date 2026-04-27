@@ -9,7 +9,7 @@ async function sendAlertEmail(alertType: string, title: string, message: string,
     await fetch(`${base}/api/alerts/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ alertType, title, message, severity, amount }),
+      body: JSON.stringify({ alertType, title, message, severity, amount, internalKey: process.env.SUPABASE_SERVICE_ROLE_KEY }),
     })
   } catch { /* email is best-effort */ }
 }
@@ -23,22 +23,17 @@ export async function POST(req: NextRequest) {
   const webhookSecret = await getWebhookSecretForUser(userId)
   const stripe = await getStripeForUser(userId)
 
-  let event: Stripe.Event
+  if (!webhookSecret || !sig) {
+    return NextResponse.json({ error: 'Webhook secret not configured or missing signature' }, { status: 400 })
+  }
 
-  if (webhookSecret && sig) {
-    try {
-      event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Webhook verification failed'
-      console.error('Webhook signature verification failed:', message)
-      return NextResponse.json({ error: message }, { status: 400 })
-    }
-  } else {
-    try {
-      event = JSON.parse(body) as Stripe.Event
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-    }
+  let event: Stripe.Event
+  try {
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Webhook verification failed'
+    console.error('Webhook signature verification failed:', message)
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 
   await saveWebhookEvent(event.id, event.type, event, userId)

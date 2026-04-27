@@ -1,9 +1,15 @@
-import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { NextRequest, NextResponse } from 'next/server'
+import { getStripeForUser } from '@/lib/stripe'
 import { getRecoveryActions } from '@/lib/db'
+import { getVerifiedUserId } from '@/lib/serverAuth'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
+    const stripe = await getStripeForUser(userId)
+
     const [subscriptions, charges, invoices] = await Promise.all([
       stripe.subscriptions.list({ limit: 100, status: 'all' }),
       stripe.charges.list({ limit: 100 }),
@@ -42,7 +48,7 @@ export async function GET() {
       : 0
     const billingErrorRevenue = openInvoices.reduce((sum, i) => sum + (i.amount_due || 0), 0) / 100
 
-    const recoveryActions = await getRecoveryActions(undefined, 200)
+    const recoveryActions = await getRecoveryActions(userId, 200)
     const successfulRecoveries = recoveryActions.filter((a: any) => a.status === 'success')
     const totalRecovered = successfulRecoveries.reduce((sum: number, a: any) => sum + a.amount, 0)
     const recoveryRate = recoveryActions.length > 0

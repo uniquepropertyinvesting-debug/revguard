@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getWebhookEvents, getRecoveryActions, getAlerts } from '@/lib/db'
+import { getVerifiedUserId } from '@/lib/serverAuth'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
-    const webhookEvents = await getWebhookEvents(undefined, 200)
-    const recoveryActions = await getRecoveryActions(undefined, 200)
-    const alerts = await getAlerts(undefined, 200)
+    const webhookEvents = await getWebhookEvents(userId, 200)
+    const recoveryActions = await getRecoveryActions(userId, 200)
+    const alerts = await getAlerts(userId, 200)
 
     const now = new Date()
     const oneDayAgo = new Date(now.getTime() - 86400 * 1000).toISOString()
@@ -16,7 +20,7 @@ export async function GET() {
     for (const ev of webhookEvents.slice(0, 15)) {
       auditLog.push({
         action: `Stripe webhook received: ${ev.event_type}`,
-        actor: 'Stripe → RevGuard',
+        actor: 'Stripe',
         time: ev.created_at,
         category: 'data_ingestion',
       })
