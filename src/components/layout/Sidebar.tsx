@@ -65,6 +65,7 @@ const NAV_GROUPS_BASE = [
   {
     label: 'ACCOUNT',
     items: [
+      { id: 'user-settings', label: 'Account Settings', icon: '⚙️' },
       { id: 'pricing', label: 'Plans & Pricing', icon: '💎', badge: 'NEW' },
     ]
   }
@@ -109,7 +110,7 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
     : user?.email?.[0].toUpperCase() || '?'
 
   return (
-    <aside style={{
+    <aside className={isOpen ? 'sidebar-overlay' : ''} style={{
       width: isOpen ? '260px' : '0',
       minWidth: isOpen ? '260px' : '0',
       overflow: 'hidden',
@@ -118,7 +119,8 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
       display: 'flex',
       flexDirection: 'column',
       transition: 'all 0.3s ease',
-      zIndex: 10
+      zIndex: 20,
+      flexShrink: 0,
     }}>
       {/* Logo */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
@@ -240,8 +242,8 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>{user?.email}</div>
             </div>
             {[
-              { icon: '👤', label: 'My Account' },
-              { icon: '🏢', label: 'Company Settings' },
+              { icon: '👤', label: 'My Account', action: () => setActiveSection('user-settings') },
+              { icon: '🏢', label: 'Company Settings', action: () => setActiveSection('user-settings') },
               { icon: '🔗', label: 'Manage Integrations', action: () => setActiveSection('integrations') },
               { icon: '💳', label: 'Billing & Plan' },
             ].map((item, i) => (

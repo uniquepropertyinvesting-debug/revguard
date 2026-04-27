@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useStripeChurnRisk } from '@/lib/useStripe'
+import { exportCsv } from '@/lib/exportCsv'
 
 const scoreColor = (score: number) => {
   if (score >= 75) return '#ef4444'
@@ -23,6 +24,8 @@ export default function ChurnRisk() {
   const { data, loading, error } = useStripeChurnRisk()
   const [sortBy, setSortBy] = useState<'score' | 'mrr'>('score')
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all')
+  const [page, setPage] = useState(0)
+  const pageSize = 10
 
   const risks: any[] = data?.risks || []
   const summary = data?.summary || { total: 0, highRisk: 0, mediumRisk: 0, mrrAtRisk: 0 }
@@ -37,12 +40,14 @@ export default function ChurnRisk() {
   const sorted = [...filtered].sort((a, b) =>
     sortBy === 'score' ? b.score - a.score : b.mrr - a.mrr
   )
+  const totalPages = Math.ceil(sorted.length / pageSize)
+  const paginated = sorted.slice(page * pageSize, (page + 1) * pageSize)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+      <div className="stats-grid">
         {[
           { label: 'MRR At Risk', value: loading ? '...' : fmt(summary.mrrAtRisk), color: '#ef4444', icon: '💸' },
           { label: 'High Risk Accounts', value: loading ? '...' : String(summary.highRisk), color: '#f59e0b', icon: '⚠️' },
@@ -83,6 +88,14 @@ export default function ChurnRisk() {
             Sort by MRR
           </button>
           <button className="btn-primary" disabled={!data || summary.highRisk === 0} title={summary.highRisk === 0 ? 'No high-risk accounts' : 'Navigate to Churn Intervention for action plans'}>Auto-Intervene High Risk</button>
+          <button
+            className="btn-secondary"
+            disabled={loading || risks.length === 0}
+            style={{ fontSize: '13px', padding: '7px 14px' }}
+            onClick={() => exportCsv('churn-risk', ['customerName', 'customerEmail', 'score', 'mrr', 'status', 'daysActive', 'signals'], sorted.map(r => ({ ...r, signals: r.signals.join('; ') })))}
+          >
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -101,12 +114,12 @@ export default function ChurnRisk() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {sorted.map((acct, i) => (
+          {paginated.map((acct, i) => (
             <div key={i} className="card" style={{ padding: '16px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div className="responsive-flex" style={{ alignItems: 'center' }}>
 
                 {/* Risk Score Gauge */}
-                <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
                   <div style={{
                     width: '60px', height: '60px', borderRadius: '50%',
                     border: `4px solid ${scoreColor(acct.score)}`,
@@ -119,8 +132,8 @@ export default function ChurnRisk() {
                 </div>
 
                 {/* Customer Info */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
                       {acct.customerName}
                     </span>
@@ -130,7 +143,7 @@ export default function ChurnRisk() {
                     {acct.status === 'past_due' && <span className="badge-red">Past Due</span>}
                     {acct.cancelAtPeriodEnd && <span className="badge-yellow">Canceling</span>}
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', wordBreak: 'break-word' }}>
                     {acct.customerEmail} · {acct.daysActive} days active · Renews {new Date(acct.currentPeriodEnd).toLocaleDateString()}
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -144,16 +157,16 @@ export default function ChurnRisk() {
                   </div>
                 </div>
 
-                {/* MRR */}
-                <div style={{ textAlign: 'right', minWidth: '100px' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 800, color: '#f59e0b' }}>{fmt(acct.mrr)}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>MRR</div>
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '120px' }}>
-                  <button className="btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>Intervene Now</button>
-                  <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>View in Stripe</button>
+                {/* MRR + Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#f59e0b' }}>{fmt(acct.mrr)}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>MRR</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button className="btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>Intervene Now</button>
+                    <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>View in Stripe</button>
+                  </div>
                 </div>
               </div>
 
@@ -165,6 +178,17 @@ export default function ChurnRisk() {
               </div>
             </div>
           ))}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, sorted.length)} of {sorted.length}
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '12px' }}>Prev</button>
+                <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '12px' }}>Next</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

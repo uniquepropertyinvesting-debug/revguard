@@ -94,7 +94,7 @@ export default function CommandCenter() {
       <AiInsightsPanel />
 
       {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         {kpiCards.map((card, i) => (
           <div key={i} className="card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -119,7 +119,7 @@ export default function CommandCenter() {
       </div>
 
       {/* Main Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div className="two-col">
 
         {/* Failed Payments from Stripe */}
         <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
