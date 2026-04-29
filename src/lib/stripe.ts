@@ -28,3 +28,15 @@ export async function getWebhookSecretForUser(userId?: string): Promise<string |
   }
   return process.env.STRIPE_WEBHOOK_SECRET
 }
+
+/**
+ * Returns a client-safe error message. Stripe API errors are designed to be
+ * shown to merchants (and the user owns the keys), so their `message` is
+ * surfaced. All other errors are masked to avoid leaking internals.
+ */
+export function safeStripeError(err: unknown, fallback = 'Stripe request failed'): string {
+  if (err instanceof Stripe.errors.StripeError) {
+    return err.message || fallback
+  }
+  return fallback
+}

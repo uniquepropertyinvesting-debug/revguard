@@ -12,8 +12,10 @@ import {
   logRecoveryAction,
   createAlert,
 } from '@/lib/db'
-import { rateLimit, rateLimitHeaders } from '@/lib/rateLimit'
+import { apiGuard } from '@/lib/apiGuard'
 import { getVerifiedUserId } from '@/lib/serverAuth'
+import { logError } from '@/lib/logger'
+import { isOneOf, isString } from '@/lib/validate'
 
 const DUNNING_STEPS = [
   {
@@ -185,24 +187,28 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ sequences, stats })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'DB error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    logError('dunning_get_failed', undefined, err)
+    return NextResponse.json({ error: 'Failed to load sequences' }, { status: 500 })
   }
 }
 
 // POST /api/dunning — run due sequences OR enroll a specific invoice OR cancel
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const { action, invoiceId } = body
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? undefined
+const VALID_ACTIONS = ['enroll', 'cancel', 'mark_recovered', 'run', 'sync'] as const
+const isAction = isOneOf(VALID_ACTIONS)
 
-    const rl = rateLimit('dunning', verifiedUserId || req.ip || 'anon', { max: 30, windowMs: 60_000 })
-    if (!rl.ok) {
-      return NextResponse.json(
-        { error: 'Too many requests — please wait a moment' },
-        { status: 429, headers: rateLimitHeaders(rl) }
-      )
+export async function POST(req: NextRequest) {
+  const guard = await apiGuard(req, { scope: 'dunning', max: 30, windowMs: 60_000, requireAuth: true })
+  if (!guard.ok) return guard.response
+  const verifiedUserId = guard.userId!
+  try {
+    const body = await req.json().catch(() => ({}))
+    const action = body?.action ?? 'run'
+    const invoiceId = body?.invoiceId
+    if (action !== undefined && !isAction(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+    if (invoiceId !== undefined && !isString(invoiceId)) {
+      return NextResponse.json({ error: 'Invalid invoiceId' }, { status: 400 })
     }
 
     const stripe = await getStripeForUser(verifiedUserId)
@@ -396,7 +402,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    logError('dunning_failed', { userId: verifiedUserId }, err)
+    return NextResponse.json({ error: 'Dunning operation failed' }, { status: 500 })
   }
 }

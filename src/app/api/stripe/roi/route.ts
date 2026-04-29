@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStripeForUser } from '@/lib/stripe'
+import { getStripeForUser, safeStripeError } from '@/lib/stripe'
 import { getRecoveryActions } from '@/lib/db'
 import { getVerifiedUserId } from '@/lib/serverAuth'
+import { logError } from '@/lib/logger'
 
 export async function GET(req: NextRequest) {
   const userId = await getVerifiedUserId(req)
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
       openInvoicesCount: openInvoices.length,
     })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    logError('stripe_roi_failed', { userId }, err)
+    return NextResponse.json({ error: safeStripeError(err) }, { status: 500 })
   }
 }

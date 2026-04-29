@@ -3,6 +3,7 @@ import { getAlertSettings, saveAlertSettings } from '@/lib/db'
 import { Resend } from 'resend'
 import { apiGuard } from '@/lib/apiGuard'
 import { logError } from '@/lib/logger'
+import { isEmail } from '@/lib/validate'
 
 export async function GET(req: NextRequest) {
   const guard = await apiGuard(req, { scope: 'alert_settings_read', max: 60, windowMs: 60_000 })
@@ -32,8 +33,7 @@ export async function GET(req: NextRequest) {
     })
   } catch (err: unknown) {
     logError('alert_settings_failed', undefined, err)
-    const message = err instanceof Error ? err.message : 'DB error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }
 }
 
@@ -42,8 +42,18 @@ export async function POST(req: NextRequest) {
   if (!guard.ok) return guard.response
   try {
     const body = await req.json()
-    const { notifyEmail, resendApiKey, ...prefs } = body
+    const { notifyEmail, resendApiKey, ...prefs } = body || {}
     const verifiedUserId = guard.userId!
+
+    if (notifyEmail !== undefined && notifyEmail !== '' && !isEmail(notifyEmail)) {
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
+    }
+    if (resendApiKey !== undefined && resendApiKey !== '' && (typeof resendApiKey !== 'string' || resendApiKey.length > 200)) {
+      return NextResponse.json({ error: 'Invalid Resend API key format' }, { status: 400 })
+    }
+    if (prefs.emailMinAmount !== undefined && (typeof prefs.emailMinAmount !== 'number' || prefs.emailMinAmount < 0 || prefs.emailMinAmount > 1_000_000)) {
+      return NextResponse.json({ error: 'Invalid emailMinAmount' }, { status: 400 })
+    }
 
     if (resendApiKey) {
       try {
@@ -70,8 +80,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
     logError('alert_settings_failed', undefined, err)
-    const message = err instanceof Error ? err.message : 'DB error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }
 }
 
@@ -108,11 +117,13 @@ export async function PUT(req: NextRequest) {
       `,
     })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+      logError('alert_settings_test_email_failed', { userId: verifiedUserId }, error)
+      return NextResponse.json({ error: 'Failed to send test email' }, { status: 400 })
+    }
     return NextResponse.json({ success: true, id: data?.id })
   } catch (err: unknown) {
     logError('alert_settings_test_email_failed', undefined, err)
-    const message = err instanceof Error ? err.message : 'Email error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to send test email' }, { status: 500 })
   }
 }

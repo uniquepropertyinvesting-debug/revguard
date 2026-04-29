@@ -110,9 +110,21 @@ export async function POST(req: NextRequest) {
   const userId = guard.userId!
 
   try {
-    const { messages } = await req.json()
-    if (!Array.isArray(messages)) {
-      return NextResponse.json({ error: 'messages required' }, { status: 400 })
+    const body = await req.json()
+    const messages = (body as { messages?: unknown }).messages
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
+      return NextResponse.json({ error: 'messages must be an array of 1-50 items' }, { status: 400 })
+    }
+    const validMessages = messages.every(
+      (m): m is { role: string; content: string } =>
+        m && typeof m === 'object'
+        && typeof (m as any).role === 'string'
+        && ['user', 'assistant', 'system'].includes((m as any).role)
+        && typeof (m as any).content === 'string'
+        && (m as any).content.length <= 8000
+    )
+    if (!validMessages) {
+      return NextResponse.json({ error: 'invalid message format' }, { status: 400 })
     }
 
     const stripe = await getStripeForUser(userId)
@@ -152,7 +164,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ content })
   } catch (err: unknown) {
     logError('ai_chat_failed', { userId }, err)
-    const message = err instanceof Error ? err.message : 'AI error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'AI request failed' }, { status: 500 })
   }
 }

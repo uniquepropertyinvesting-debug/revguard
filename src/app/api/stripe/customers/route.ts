@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStripeForUser } from '@/lib/stripe'
+import { getStripeForUser, safeStripeError } from '@/lib/stripe'
 import { getVerifiedUserId } from '@/lib/serverAuth'
+import { logError } from '@/lib/logger'
 
 async function paginate<T>(iter: AsyncIterable<T>, maxItems = 2000): Promise<T[]> {
   const results: T[] = []
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ customers: result })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    logError('stripe_customers_failed', { userId }, err)
+    return NextResponse.json({ error: safeStripeError(err) }, { status: 500 })
   }
 }

@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getStripeForUser } from '@/lib/stripe'
+import { getStripeForUser, safeStripeError } from '@/lib/stripe'
 import { logRecoveryAction, createAlert } from '@/lib/db'
 import { apiGuard } from '@/lib/apiGuard'
 import { logError } from '@/lib/logger'
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       currency: result.currency?.toUpperCase(),
     })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Stripe error'
+    const safeMsg = safeStripeError(err, 'Retry failed')
     logError('stripe_retry_failed', { userId: verifiedUserId }, err)
     try {
       await logRecoveryAction({
@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
         currency: 'USD',
         action: 'manual_retry',
         status: 'failed',
-        result: message,
+        result: safeMsg,
       })
     } catch {}
 
-    return NextResponse.json({ error: message }, { status: 400 })
+    return NextResponse.json({ error: safeMsg }, { status: 400 })
   }
 }
