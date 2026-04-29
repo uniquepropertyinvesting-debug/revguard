@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useStripeBillingErrors } from '@/lib/useStripe'
-import { exportCsv } from '@/lib/exportCsv'
 
 const typeColors: Record<string, string> = {
   'Duplicate': 'badge-red',
@@ -20,8 +19,6 @@ function fmt(n: number) {
 export default function BillingErrors() {
   const { data, loading, error } = useStripeBillingErrors()
   const [filter, setFilter] = useState('all')
-  const [page, setPage] = useState(0)
-  const pageSize = 10
 
   const errors: any[] = data?.errors || []
   const summary = data?.summary || { total: 0, open: 0, totalImpact: 0, resolved: 0 }
@@ -33,14 +30,12 @@ export default function BillingErrors() {
       : filter === 'resolved'
         ? errors.filter(e => e.status === 'paid')
         : errors
-  const totalPages = Math.ceil(filtered.length / pageSize)
-  const paginated = filtered.slice(page * pageSize, (page + 1) * pageSize)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       {/* Stats */}
-      <div className="stats-grid">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
         {[
           { label: 'Open Errors', value: loading ? '...' : String(summary.open), color: '#ef4444', icon: '🚨' },
           { label: 'Total Impact', value: loading ? '...' : fmt(summary.totalImpact), color: '#f59e0b', icon: '💸' },
@@ -73,17 +68,7 @@ export default function BillingErrors() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn-primary" disabled={loading || !!error} title="Refreshes billing error data">Run Billing Audit</button>
-          <button
-            className="btn-secondary"
-            disabled={loading || errors.length === 0}
-            style={{ fontSize: '13px', padding: '8px 16px' }}
-            onClick={() => exportCsv('billing-errors', ['customerName', 'customerEmail', 'type', 'amount', 'status', 'description', 'created', 'attemptCount'], filtered)}
-          >
-            Export CSV
-          </button>
-        </div>
+        <button className="btn-primary">🔍 Run Billing Audit</button>
       </div>
 
       {/* Error Cards */}
@@ -101,11 +86,11 @@ export default function BillingErrors() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {paginated.map((err: any) => (
+          {filtered.map((err: any) => (
             <div key={err.id} className="card" style={{ padding: '16px 20px' }}>
-              <div className="responsive-flex" style={{ alignItems: 'flex-start' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                     <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
                       {err.customerName}
                     </span>
@@ -115,62 +100,49 @@ export default function BillingErrors() {
                   <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                     {err.description}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', wordBreak: 'break-word' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {err.customerEmail && <span>{err.customerEmail} · </span>}
                     Invoice {err.id.slice(0, 16)}... · {new Date(err.created).toLocaleDateString()}
                     {err.attemptCount > 1 && <span> · {err.attemptCount} attempts</span>}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: err.type === 'Undercharge' ? '#f59e0b' : '#ef4444' }}>
-                      {fmt(err.amount)}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{err.currency}</div>
-                    <span className={
-                      err.status === 'paid' ? 'badge-green' :
-                      err.status === 'open' ? 'badge-yellow' :
-                      err.status === 'void' ? 'badge-blue' : 'badge-red'
-                    }>
-                      {err.status}
-                    </span>
+                <div style={{ textAlign: 'right', minWidth: '120px' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: err.type === 'Undercharge' ? '#f59e0b' : '#ef4444' }}>
+                    {fmt(err.amount)}
                   </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{err.currency}</div>
+                  <span className={
+                    err.status === 'paid' ? 'badge-green' :
+                    err.status === 'open' ? 'badge-yellow' :
+                    err.status === 'void' ? 'badge-blue' : 'badge-red'
+                  }>
+                    {err.status}
+                  </span>
+                </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {err.status !== 'paid' && err.status !== 'void' && (
-                      <>
-                        {err.hostedUrl ? (
-                          <a href={err.hostedUrl} target="_blank" rel="noopener noreferrer"
-                            className="btn-primary"
-                            style={{ fontSize: '12px', padding: '6px 12px', textDecoration: 'none', textAlign: 'center' }}>
-                            Fix Now ↗
-                          </a>
-                        ) : (
-                          <button className="btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>Fix Now</button>
-                        )}
-                        <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>Review</button>
-                      </>
-                    )}
-                    {(err.status === 'paid' || err.status === 'void') && (
-                      <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>View Log</button>
-                    )}
-                  </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '100px' }}>
+                  {err.status !== 'paid' && err.status !== 'void' && (
+                    <>
+                      {err.hostedUrl ? (
+                        <a href={err.hostedUrl} target="_blank" rel="noopener noreferrer"
+                          className="btn-primary"
+                          style={{ fontSize: '12px', padding: '6px 12px', textDecoration: 'none', textAlign: 'center' }}>
+                          Fix Now ↗
+                        </a>
+                      ) : (
+                        <button className="btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>Fix Now</button>
+                      )}
+                      <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>Review</button>
+                    </>
+                  )}
+                  {(err.status === 'paid' || err.status === 'void') && (
+                    <button className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>View Log</button>
+                  )}
                 </div>
               </div>
             </div>
           ))}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '12px' }}>Prev</button>
-                <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '12px' }}>Next</button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 

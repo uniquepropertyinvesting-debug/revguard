@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripeForUser } from '@/lib/stripe'
 import { Resend } from 'resend'
-import { escapeHtml } from '@/lib/sanitize'
 import {
   getDunningSequences,
   getDunningSequenceDue,
@@ -50,8 +49,8 @@ function buildDunningEmail(params: {
   dashboardUrl: string
 }) {
   const { step, customerName, amount, currency, dashboardUrl } = params
-  const amountStr = `${escapeHtml(currency)} $${amount.toFixed(2)}`
-  const firstName = escapeHtml(customerName.split(' ')[0] || customerName)
+  const amountStr = `${currency} $${amount.toFixed(2)}`
+  const firstName = customerName.split(' ')[0] || customerName
 
   const configs = [
     {
@@ -211,7 +210,6 @@ export async function POST(req: NextRequest) {
     // --- ENROLL: add a specific invoice to dunning ---
     if (action === 'enroll') {
       if (!invoiceId) return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
-      if (!/^in_[a-zA-Z0-9]+$/.test(invoiceId)) return NextResponse.json({ error: 'Invalid invoice ID format' }, { status: 400 })
 
       const invoice = await stripe.invoices.retrieve(invoiceId)
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id || ''

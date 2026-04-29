@@ -103,71 +103,15 @@ async function getStripeContext(stripe: Stripe): Promise<string> {
   }
 }
 
-const ANALYZE_SYSTEM = `You are RevGuard AI Analyzer, an expert Revenue Loss Prevention analyst for SaaS companies.
-You have LIVE Stripe data below. Produce structured JSON analysis. Be specific with exact numbers.
-
-Return ONLY valid JSON with this exact structure:
-{
-  "healthScore": <number 0-100>,
-  "healthLabel": "<Excellent|Good|Needs Attention|Critical>",
-  "summary": "<2-3 sentence executive summary referencing exact numbers>",
-  "findings": [
-    {
-      "category": "<revenue|churn|billing|recovery|growth>",
-      "severity": "<critical|warning|positive|info>",
-      "title": "<short finding title>",
-      "explanation": "<1-2 sentence explanation with specific numbers>",
-      "action": "<specific recommended action>"
-    }
-  ],
-  "metrics": {
-    "mrrTrend": "<up|down|stable>",
-    "biggestRisk": "<one-line description of biggest risk>",
-    "quickWin": "<one-line description of the easiest revenue win>",
-    "projectedMonthlyLoss": <number>,
-    "projectedAnnualLoss": <number>,
-    "recoveryPotential": <number dollar amount recoverable>
-  }
-}
-
-Include 4-8 findings covering all categories. Findings should be ordered by severity (critical first). Be brutally honest.`
-
-const EXPLAIN_SYSTEM = `You are RevGuard AI, an expert Revenue Loss Prevention advisor.
-You have LIVE Stripe data below. The user is asking about a specific metric or situation.
-Explain clearly in 2-4 sentences: what it means, why it matters, and one concrete action.
-Use exact numbers from the data. Be direct and practical, not generic.`
-
-async function callOpenAI(systemPrompt: string, userContent: string, stripeContext: string) {
-  const openaiApiKey = process.env.OPENAI_API_KEY
-  if (!openaiApiKey) throw new Error('AI not configured')
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiApiKey}`,
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o',
-      messages: [
-        { role: 'system', content: `${systemPrompt}\n\n${stripeContext}` },
-        { role: 'user', content: userContent },
-      ],
-    }),
-  })
-
-  if (!res.ok) throw new Error('AI request failed')
-  const data = await res.json()
-  return data.choices?.[0]?.message?.content || ''
-}
-
 export async function POST(req: NextRequest) {
   const userId = await getVerifiedUserId(req)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const body = await req.json()
-    const { mode } = body
+    const { messages } = await req.json()
+    if (!Array.isArray(messages)) {
+      return NextResponse.json({ error: 'messages required' }, { status: 400 })
+    }
 
     const stripe = await getStripeForUser(userId)
     const stripeContext = await getStripeContext(stripe)
@@ -175,34 +119,6 @@ export async function POST(req: NextRequest) {
     const openaiApiKey = process.env.OPENAI_API_KEY
     if (!openaiApiKey) {
       return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
-    }
-
-    // Mode: analyze — returns structured JSON analysis
-    if (mode === 'analyze') {
-      const raw = await callOpenAI(ANALYZE_SYSTEM, 'Analyze this account now.', stripeContext)
-      try {
-        const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-        const analysis = JSON.parse(cleaned)
-        return NextResponse.json({ analysis })
-      } catch {
-        return NextResponse.json({ analysis: null, raw })
-      }
-    }
-
-    // Mode: explain — returns a short explanation for a specific metric/topic
-    if (mode === 'explain') {
-      const { topic } = body
-      if (!topic || typeof topic !== 'string') {
-        return NextResponse.json({ error: 'topic required' }, { status: 400 })
-      }
-      const content = await callOpenAI(EXPLAIN_SYSTEM, topic, stripeContext)
-      return NextResponse.json({ content })
-    }
-
-    // Default: chat mode
-    const { messages } = body
-    if (!Array.isArray(messages)) {
-      return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
 
     const systemPrompt = `You are RevGuard AI, an expert Revenue Loss Prevention assistant for SaaS companies.\nYou have access to LIVE Stripe data for this account. Use it to give specific, accurate, actionable answers.\nBe concise but highly specific — reference exact numbers from the data below.\nSuggest concrete next steps. Use markdown formatting (bold, bullet points) in responses.\n\n${stripeContext}`

@@ -226,35 +226,6 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--accent-blue);
 }
 
-input:focus-visible, select:focus-visible, textarea:focus-visible {
-  border-color: var(--accent-blue);
-  outline: 2px solid rgba(59, 130, 246, 0.4);
-  outline-offset: 1px;
-}
-
-button:focus-visible {
-  outline: 2px solid var(--accent-blue);
-  outline-offset: 2px;
-}
-
-.btn-primary:disabled, .btn-secondary:disabled, .btn-danger:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.btn-primary:disabled:hover {
-  opacity: 0.45;
-  transform: none;
-  box-shadow: none;
-}
-
-.btn-secondary:disabled:hover {
-  border-color: var(--border-light);
-  color: var(--text-primary);
-}
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -329,61 +300,4 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   z-index: 100;
   pointer-events: none;
   margin-bottom: 4px;
-}
-
-/* ========== Responsive utilities ========== */
-
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.responsive-main { padding: 24px; }
-.hide-mobile { display: revert; }
-.show-mobile { display: none !important; }
-.responsive-flex { display: flex; gap: 12px; flex-wrap: wrap; }
-.sidebar-overlay { display: none; }
-
-/* Mobile sidebar overlay backdrop */
-.sidebar-backdrop {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(2px);
-  z-index: 9;
-}
-
-@media (max-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .two-col { grid-template-columns: 1fr; }
-  .responsive-main { padding: 16px; }
-}
-
-@media (max-width: 768px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .responsive-main { padding: 12px; }
-  .hide-mobile { display: none !important; }
-  .show-mobile { display: revert !important; }
-  .card { border-radius: 10px; }
-
-  .sidebar-overlay {
-    display: block;
-    position: fixed;
-    left: 0; top: 0; bottom: 0;
-    z-index: 20;
-  }
-
-  .sidebar-backdrop.open {
-    display: block;
-  }
-
-  th, td { padding: 10px 10px; font-size: 12px; }
-
-  .btn-primary, .btn-secondary { padding: 8px 14px; font-size: 13px; }
-
-  input, select, textarea { padding: 8px 10px; font-size: 13px; }
-}
-
-@media (max-width: 480px) {
-  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .responsive-main { padding: 10px; }
-  th, td { padding: 8px 6px; font-size: 11px; }
 }

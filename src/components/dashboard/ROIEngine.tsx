@@ -8,7 +8,7 @@ function fmt(n: number) {
 }
 
 export default function ROIEngine() {
-  const { data, loading, error } = useStripeROI()
+  const { data, loading } = useStripeROI()
 
   const [mrr, setMrr] = useState('0')
   const [churnRate, setChurnRate] = useState('0')
@@ -39,20 +39,6 @@ export default function ROIEngine() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-      {error && (
-        <div style={{
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-          borderRadius: '10px', padding: '16px 20px',
-          display: 'flex', alignItems: 'center', gap: '12px'
-        }}>
-          <span style={{ fontSize: '20px' }}>&#9888;</span>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '2px' }}>Unable to load ROI data</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{error} -- You can still use the calculator manually below.</div>
-          </div>
-        </div>
-      )}
 
       {!loading && data && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>

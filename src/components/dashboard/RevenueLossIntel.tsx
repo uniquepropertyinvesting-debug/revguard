@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { authFetch } from '@/lib/auth'
-import AiExplainButton from '@/components/ai/AiExplainButton'
 
 interface IntelData {
   mrr: number
@@ -19,22 +18,16 @@ interface IntelData {
   recoveryRate: string
 }
 
-function checkedJson(r: Response) {
-  if (!r.ok) throw new Error(`Request failed (${r.status})`)
-  return r.json()
-}
-
 export default function RevenueLossIntel() {
   const [data, setData] = useState<IntelData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
-      authFetch('/api/stripe/overview').then(checkedJson),
-      authFetch('/api/stripe/churn-risk').then(checkedJson),
-      authFetch('/api/stripe/billing-errors').then(checkedJson),
-      authFetch('/api/stripe/usage-mismatch').then(checkedJson),
+      authFetch('/api/stripe/overview').then(r => r.json()),
+      authFetch('/api/stripe/churn-risk').then(r => r.json()),
+      authFetch('/api/stripe/billing-errors').then(r => r.json()),
+      authFetch('/api/stripe/usage-mismatch').then(r => r.json()),
     ]).then(([overview, churn, billing, usage]) => {
       const failedRevenue = overview.failedRevenue || 0
       const mrrAtRisk = churn.summary?.mrrAtRisk || 0
@@ -56,20 +49,12 @@ export default function RevenueLossIntel() {
         totalLeakage,
         recoveryRate: overview.recoveryRate || '0',
       })
-    }).catch((e) => setError(e.message || 'Failed to load intelligence data')).finally(() => setLoading(false))
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px', color: 'var(--text-muted)' }}>
       Loading revenue intelligence...
-    </div>
-  )
-
-  if (error) return (
-    <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
-      <div style={{ fontSize: '28px', marginBottom: '12px' }}>&#9888;</div>
-      <div style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444', marginBottom: '6px' }}>Unable to load revenue intelligence</div>
-      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{error}</div>
     </div>
   )
 
@@ -140,10 +125,7 @@ export default function RevenueLossIntel() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ fontSize: '20px', fontWeight: 800 }}>Revenue Intelligence Report</div>
-            <AiExplainButton topic={`Give me an executive summary of my revenue health. Total leakage is $${data.totalLeakage.toFixed(0)} across failed payments ($${data.failedRevenue.toFixed(0)}), churn risk ($${data.mrrAtRisk.toFixed(0)}), billing errors ($${data.billingErrorImpact.toFixed(0)}), and usage mismatch ($${data.usageMismatchImpact.toFixed(0)}). Recovery rate is ${data.recoveryRate}%. What should I prioritize?`} label="AI Summary" />
-          </div>
+          <div style={{ fontSize: '20px', fontWeight: 800 }}>Revenue Intelligence Report</div>
           <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
             Live Stripe data · Updated in real-time
           </div>

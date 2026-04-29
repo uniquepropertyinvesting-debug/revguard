@@ -3,18 +3,7 @@ import { getStripeConnection } from '@/lib/db'
 
 const STRIPE_API_VERSION = '2025-01-27.acacia' as const
 
-function getDefaultStripeKey(): string {
-  const key = process.env.STRIPE_SECRET_KEY
-  if (key) return key
-  const isBuild = process.env.NEXT_PHASE === 'phase-production-build'
-  if (process.env.NODE_ENV === 'production' && !isBuild) {
-    throw new Error('STRIPE_SECRET_KEY must be set in production')
-  }
-  console.warn('[RevGuard] WARNING: STRIPE_SECRET_KEY not set. Stripe calls will fail.')
-  return 'sk_test_placeholder'
-}
-
-export const stripe = new Stripe(getDefaultStripeKey(), {
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
   apiVersion: STRIPE_API_VERSION,
 })
 

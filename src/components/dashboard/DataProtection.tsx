@@ -38,30 +38,20 @@ export default function DataProtection() {
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     authFetch('/api/data-protection')
-      .then(r => { if (!r.ok) throw new Error(`Request failed (${r.status})`); return r.json() })
+      .then(r => r.json())
       .then(d => {
         if (d.auditLog) setAuditLog(d.auditLog)
         if (d.stats) setStats(d.stats)
       })
-      .catch((e) => setError(e.message || 'Failed to load protection data'))
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-      {error && (
-        <div style={{
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-          borderRadius: '10px', padding: '14px 20px', fontSize: '13px', color: '#ef4444'
-        }}>
-          {error}
-        </div>
-      )}
 
       {/* Status Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>

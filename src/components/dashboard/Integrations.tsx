@@ -51,7 +51,6 @@ export default function Integrations() {
     const load = async () => {
       try {
         const r = await authFetch('/api/db/stripe-connect')
-        if (!r.ok) throw new Error('Failed to check connection')
         const data = await r.json()
         setStripeStatus(data)
       } catch {
@@ -74,11 +73,6 @@ export default function Integrations() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ secretKey, webhookSecret: webhookSecret || undefined }),
       })
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: `Save failed (${res.status})` }))
-        setSaveMsg(errData.error || `Save failed (${res.status})`)
-        return
-      }
       const data = await res.json()
       if (data.success) {
         setStripeStatus({ connected: true, hasWebhookSecret: !!webhookSecret, connectedAt: Date.now() / 1000 })
@@ -106,7 +100,9 @@ export default function Integrations() {
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await authFetch('/api/stripe/overview')
+      // Quick validation: hit our overview endpoint which uses the stored key
+      // For a new key being tested before saving, we test by trying to save temporarily
+      const res = await fetch('/api/stripe/overview')
       if (res.ok) {
         setTestResult({ ok: true, message: 'Stripe connection is working' })
       } else {

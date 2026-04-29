@@ -2,15 +2,12 @@
 
 import { useState } from 'react'
 import { useStripeFailedPayments, useStripeOverview } from '@/lib/useStripe'
-import { exportCsv } from '@/lib/exportCsv'
 
 export default function FailedPayments() {
   const { data: failedPayments, loading, error } = useStripeFailedPayments()
   const { data: overview } = useStripeOverview()
   const [selected, setSelected] = useState<string[]>([])
   const [filter, setFilter] = useState('all')
-  const [page, setPage] = useState(0)
-  const pageSize = 15
 
   const toggleSelect = (id: string) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -25,15 +22,13 @@ export default function FailedPayments() {
 
   const enriched = failedPayments.map(p => ({ ...p, risk: getRisk(p.amount, p.failureCode) }))
   const filtered = filter === 'all' ? enriched : enriched.filter(p => p.risk === filter)
-  const totalPages = Math.ceil(filtered.length / pageSize)
-  const paginated = filtered.slice(page * pageSize, (page + 1) * pageSize)
   const totalAtRisk = failedPayments.reduce((sum, p) => sum + p.amount, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       {/* Stats */}
-      <div className="stats-grid">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
         {[
           { label: 'Total At Risk', value: loading ? '...' : `$${totalAtRisk.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, color: '#ef4444', icon: '💸' },
           { label: 'Failed Payments', value: loading ? '...' : String(failedPayments.length), color: '#f59e0b', icon: '❌' },
@@ -77,20 +72,12 @@ export default function FailedPayments() {
               </button>
             </>
           )}
-          <button className="btn-primary" disabled={loading || failedPayments.length === 0}>Smart Retry All</button>
-          <button
-            className="btn-secondary"
-            disabled={loading || failedPayments.length === 0}
-            style={{ fontSize: '13px', padding: '8px 16px' }}
-            onClick={() => exportCsv('failed-payments', ['customerName', 'customerEmail', 'amount', 'failureMessage', 'failureCode', 'created', 'paymentMethod'], filtered)}
-          >
-            Export CSV
-          </button>
+          <button className="btn-primary">+ Smart Retry All</button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="card table-scroll" style={{ overflow: 'hidden' }}>
+      <div className="card" style={{ overflow: 'hidden' }}>
         {error ? (
           <div style={{ padding: '24px', textAlign: 'center', color: '#ef4444' }}>
             Stripe error: {error}
@@ -104,7 +91,6 @@ export default function FailedPayments() {
             ✅ No failed payments found — your revenue is protected!
           </div>
         ) : (
-          <>
           <table>
             <thead>
               <tr>
@@ -113,15 +99,15 @@ export default function FailedPayments() {
                 </th>
                 <th>Customer</th>
                 <th>Amount</th>
-                <th className="hide-mobile">Failure Reason</th>
+                <th>Failure Reason</th>
                 <th>Date</th>
-                <th className="hide-mobile">Method</th>
+                <th>Method</th>
                 <th>Risk</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginated.map(p => (
+              {filtered.map(p => (
                 <tr key={p.id}>
                   <td>
                     <input type="checkbox" checked={selected.includes(p.id)} onChange={() => toggleSelect(p.id)} />
@@ -133,11 +119,11 @@ export default function FailedPayments() {
                   <td style={{ color: '#ef4444', fontWeight: 700, fontSize: '15px' }}>
                     ${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="hide-mobile">{p.failureMessage}</td>
+                  <td>{p.failureMessage}</td>
                   <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     {new Date(p.created).toLocaleDateString()}
                   </td>
-                  <td className="hide-mobile">
+                  <td>
                     <span className="badge-purple">{p.paymentMethod}</span>
                   </td>
                   <td>
@@ -159,18 +145,6 @@ export default function FailedPayments() {
               ))}
             </tbody>
           </table>
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '12px' }}>Prev</button>
-                <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '12px' }}>Next</button>
-              </div>
-            </div>
-          )}
-          </>
         )}
       </div>
 

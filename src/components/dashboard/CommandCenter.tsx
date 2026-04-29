@@ -1,17 +1,14 @@
 'use client'
 
 import { useStripeOverview, useStripeFailedPayments } from '@/lib/useStripe'
-import AiInsightsPanel from '@/components/ai/AiInsightsPanel'
-import AiExplainButton from '@/components/ai/AiExplainButton'
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 export default function CommandCenter() {
-  const { data: overview, loading: ovLoading, error: ovError } = useStripeOverview()
-  const { data: failed, loading: failLoading, error: failError } = useStripeFailedPayments()
-  const dataError = ovError || failError
+  const { data: overview, loading: ovLoading } = useStripeOverview()
+  const { data: failed, loading: failLoading } = useStripeFailedPayments()
 
   const kpiCards = [
     {
@@ -49,24 +46,6 @@ export default function CommandCenter() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-      {dataError && (
-        <div style={{
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-          borderRadius: '10px', padding: '16px 20px',
-          display: 'flex', alignItems: 'center', gap: '12px'
-        }}>
-          <span style={{ fontSize: '20px' }}>&#9888;</span>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '2px' }}>
-              Unable to load Stripe data
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              {dataError} -- Check that your Stripe key is connected in Integrations.
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header Banner */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.1))',
@@ -90,11 +69,8 @@ export default function CommandCenter() {
         </div>
       </div>
 
-      {/* AI Analysis */}
-      <AiInsightsPanel />
-
       {/* KPI Grid */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {kpiCards.map((card, i) => (
           <div key={i} className="card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -119,7 +95,7 @@ export default function CommandCenter() {
       </div>
 
       {/* Main Grid */}
-      <div className="two-col">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
         {/* Failed Payments from Stripe */}
         <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -131,10 +107,7 @@ export default function CommandCenter() {
               <div className="pulse-dot" style={{ background: '#ef4444' }} />
               <span style={{ fontWeight: 700, fontSize: '14px' }}>Failed Payments</span>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <AiExplainButton topic={`Why are payments failing? I have ${failed.length} failed payments totaling $${failed.reduce((s: number, p: any) => s + p.amount, 0).toFixed(0)}. What are the main failure reasons and what should I do?`} />
-              <span className="badge-red">{failLoading ? '...' : `${failed.length} Failed`}</span>
-            </div>
+            <span className="badge-red">{failLoading ? '...' : `${failed.length} Failed`}</span>
           </div>
           <div>
             {failLoading ? (
@@ -173,10 +146,7 @@ export default function CommandCenter() {
         <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, fontSize: '14px' }}>Subscription Health</span>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <AiExplainButton topic={`Analyze my subscription health: ${overview?.activeSubscriptions ?? 0} active, ${overview?.pastDueSubscriptions ?? 0} past due, ${overview?.canceledSubscriptions ?? 0} canceled. MRR is $${(overview?.mrr ?? 0).toFixed(0)}. Is this healthy?`} />
-              <span className="badge-green">Live</span>
-            </div>
+            <span className="badge-green">Live</span>
           </div>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {ovLoading ? (

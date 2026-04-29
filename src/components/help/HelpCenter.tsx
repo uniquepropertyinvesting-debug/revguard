@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { safeBoldHtml } from '@/lib/sanitize'
 
 interface HelpCenterProps {
   onClose: () => void
@@ -555,7 +554,7 @@ export default function HelpCenter({ onClose, initialSection = 'getting-started'
         return (
           <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px', paddingLeft: '8px' }}>
             <span style={{ color: '#3b82f6', fontSize: '12px', marginTop: '2px', flexShrink: 0 }}>•</span>
-            <span style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: safeBoldHtml(text) }} />
+            <span style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: text.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary)">$1</strong>') }} />
           </div>
         )
       }
@@ -566,7 +565,7 @@ export default function HelpCenter({ onClose, initialSection = 'getting-started'
           <div key={i} style={{ display: 'grid', gridTemplateColumns: `repeat(${cells.length}, 1fr)`, borderBottom: '1px solid var(--border)', padding: '8px 0' }}>
             {cells.map((cell, j) => (
               <span key={j} style={{ fontSize: '13px', color: 'var(--text-secondary)', paddingRight: '8px' }}
-                dangerouslySetInnerHTML={{ __html: safeBoldHtml(cell) }}
+                dangerouslySetInnerHTML={{ __html: cell.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary)">$1</strong>') }}
               />
             ))}
           </div>
@@ -578,14 +577,14 @@ export default function HelpCenter({ onClose, initialSection = 'getting-started'
           <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', paddingLeft: '8px' }}>
             <span style={{ color: '#3b82f6', fontWeight: 700, fontSize: '13px', flexShrink: 0, minWidth: '16px' }}>{line.match(/^\d+/)?.[0]}.</span>
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}
-              dangerouslySetInnerHTML={{ __html: safeBoldHtml(line.replace(/^\d+\.\s*/, '')) }}
+              dangerouslySetInnerHTML={{ __html: line.replace(/^\d+\.\s*/, '').replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary)">$1</strong>') }}
             />
           </div>
         )
       }
       return (
         <p key={i} style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '8px' }}
-          dangerouslySetInnerHTML={{ __html: safeBoldHtml(line) }}
+          dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary)">$1</strong>') }}
         />
       )
     })

@@ -46,7 +46,6 @@ export default function AIAssistant() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages }),
       })
-      if (!res.ok) throw new Error(`AI request failed (${res.status})`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
@@ -105,10 +104,15 @@ export default function AIAssistant() {
         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600 }}>QUICK INSIGHTS</div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {suggestions.map((s, i) => (
-            <button key={i} onClick={() => sendMessage(s)} disabled={loading} className="btn-secondary" style={{
+            <button key={i} onClick={() => sendMessage(s)} disabled={loading} style={{
               padding: '6px 12px', borderRadius: '20px', fontSize: '12px',
-              opacity: loading ? 0.5 : 1
-            }}>{s}</button>
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              color: 'var(--text-secondary)', cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s', opacity: loading ? 0.5 : 1
+            }}
+              onMouseEnter={e => { if (!loading) { (e.target as HTMLElement).style.borderColor = '#8b5cf6'; (e.target as HTMLElement).style.color = '#8b5cf6' } }}
+              onMouseLeave={e => { (e.target as HTMLElement).style.borderColor = 'var(--border)'; (e.target as HTMLElement).style.color = 'var(--text-secondary)' }}
+            >{s}</button>
           ))}
         </div>
       </div>

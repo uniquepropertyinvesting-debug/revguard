@@ -24,14 +24,12 @@ const NAV_GROUPS_BASE = [
     label: 'OVERVIEW',
     items: [
       { id: 'command-center', label: 'Command Center', icon: '⚡', badge: 'LIVE' },
-      { id: 'live-feed', label: 'Live Feed', icon: '📡', badge: 'LIVE' },
     ]
   },
   {
     label: 'REVENUE INTELLIGENCE',
     items: [
       { id: 'revenue-loss-intel', label: 'Revenue Loss Intel', icon: '🔍' },
-      { id: 'revenue-analyzer', label: 'AI Analyzer', icon: '✦', badge: 'AI' },
       { id: 'roi-engine', label: 'ROI Engine', icon: '📈' },
     ]
   },
@@ -53,10 +51,9 @@ const NAV_GROUPS_BASE = [
     ]
   },
   {
-    label: 'AUTOMATION & PLATFORM',
+    label: 'CUSTOMERS & PLATFORM',
     items: [
-      { id: 'n8n-automation', label: 'n8n Automation', icon: '🤖', badge: 'NEW' },
-      { id: 'ai-assistant', label: 'AI Revenue Assistant', icon: '💬', badge: 'AI' },
+      { id: 'ai-assistant', label: 'AI Revenue Assistant', icon: '🤖', badge: 'AI' },
       { id: 'integrations', label: 'Integrations', icon: '🔗' },
       { id: 'data-protection', label: 'Data Protection', icon: '🔒' },
       { id: 'alert-settings', label: 'Alert Settings', icon: '📧' },
@@ -65,7 +62,6 @@ const NAV_GROUPS_BASE = [
   {
     label: 'ACCOUNT',
     items: [
-      { id: 'user-settings', label: 'Account Settings', icon: '⚙️' },
       { id: 'pricing', label: 'Plans & Pricing', icon: '💎', badge: 'NEW' },
     ]
   }
@@ -82,11 +78,10 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const safeJson = (r: Response) => r.ok ? r.json() : Promise.resolve({})
         const [overview, billing, churn] = await Promise.all([
-          authFetch('/api/stripe/overview').then(safeJson).catch(() => ({})),
-          authFetch('/api/stripe/billing-errors').then(safeJson).catch(() => ({})),
-          authFetch('/api/stripe/churn-risk').then(safeJson).catch(() => ({})),
+          authFetch('/api/stripe/overview').then(r => r.json()).catch(() => ({})),
+          authFetch('/api/stripe/billing-errors').then(r => r.json()).catch(() => ({})),
+          authFetch('/api/stripe/churn-risk').then(r => r.json()).catch(() => ({})),
         ])
         setAlertCounts({
           failedCount: overview.failedCount || 0,
@@ -110,7 +105,7 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
     : user?.email?.[0].toUpperCase() || '?'
 
   return (
-    <aside className={isOpen ? 'sidebar-overlay' : ''} style={{
+    <aside style={{
       width: isOpen ? '260px' : '0',
       minWidth: isOpen ? '260px' : '0',
       overflow: 'hidden',
@@ -119,8 +114,7 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
       display: 'flex',
       flexDirection: 'column',
       transition: 'all 0.3s ease',
-      zIndex: 20,
-      flexShrink: 0,
+      zIndex: 10
     }}>
       {/* Logo */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
@@ -156,7 +150,6 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
                   key={item.id}
                   className={`sidebar-link ${activeSection === item.id ? 'active' : ''}`}
                   onClick={() => setActiveSection(item.id as Section)}
-                  aria-current={activeSection === item.id ? 'page' : undefined}
                 >
                   <span style={{ fontSize: '16px' }}>{item.icon}</span>
                   <span style={{ flex: 1 }}>{item.label}</span>
@@ -166,14 +159,11 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
                     </span>
                   )}
                   {liveCount > 0 && (
-                    <span
-                      aria-label={`${liveCount} alerts`}
-                      style={{
-                        background: '#ef4444', color: 'white',
-                        borderRadius: '10px', padding: '1px 6px',
-                        fontSize: '10px', fontWeight: 700
-                      }}
-                    >{liveCount}</span>
+                    <span style={{
+                      background: '#ef4444', color: 'white',
+                      borderRadius: '10px', padding: '1px 6px',
+                      fontSize: '10px', fontWeight: 700
+                    }}>{liveCount}</span>
                   )}
                 </button>
               )
@@ -242,8 +232,8 @@ export default function Sidebar({ activeSection, setActiveSection, isOpen }: Sid
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>{user?.email}</div>
             </div>
             {[
-              { icon: '👤', label: 'My Account', action: () => setActiveSection('user-settings') },
-              { icon: '🏢', label: 'Company Settings', action: () => setActiveSection('user-settings') },
+              { icon: '👤', label: 'My Account' },
+              { icon: '🏢', label: 'Company Settings' },
               { icon: '🔗', label: 'Manage Integrations', action: () => setActiveSection('integrations') },
               { icon: '💳', label: 'Billing & Plan' },
             ].map((item, i) => (

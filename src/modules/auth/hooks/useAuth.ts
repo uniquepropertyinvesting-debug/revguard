@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { logAudit } from '@/lib/audit'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export interface AuthUser {
@@ -68,7 +67,6 @@ export function useAuthProvider(): AuthContextType {
     if (error) throw error
     const mapped = mapUser(data.user)
     setUser(mapped)
-    logAudit('login', 'user', mapped.id)
     return mapped
   }, [])
 
@@ -90,18 +88,12 @@ export function useAuthProvider(): AuthContextType {
 
     const mapped = mapUser(data.user)
     setUser(mapped)
-    logAudit('signup', 'user', mapped.id)
     return mapped
   }, [])
 
   const logout = useCallback(async () => {
-    logAudit('logout', 'user')
     const supabase = createClient()
-    try {
-      await supabase.auth.signOut()
-    } catch {
-      // signOut can fail on network issues; clear local state regardless
-    }
+    await supabase.auth.signOut()
     setUser(null)
   }, [])
 

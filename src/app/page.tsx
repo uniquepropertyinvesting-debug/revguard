@@ -16,10 +16,6 @@ import RevenueLossIntel from '@/components/dashboard/RevenueLossIntel'
 import ChurnIntervention from '@/components/dashboard/ChurnIntervention'
 import AlertSettings from '@/components/dashboard/AlertSettings'
 import AutomatedDunning from '@/components/dashboard/AutomatedDunning'
-import LiveFeed from '@/components/dashboard/LiveFeed'
-import N8nAutomation from '@/components/dashboard/N8nAutomation'
-import RevenueAnalyzer from '@/components/dashboard/RevenueAnalyzer'
-import UserSettings from '@/components/dashboard/UserSettings'
 import Pricing from '@/components/dashboard/Pricing'
 import Sidebar from '@/components/layout/Sidebar'
 import TopBar from '@/components/layout/TopBar'
@@ -41,10 +37,6 @@ export type Section =
   | 'churn-intervention'
   | 'alert-settings'
   | 'automated-dunning'
-  | 'live-feed'
-  | 'n8n-automation'
-  | 'revenue-analyzer'
-  | 'user-settings'
   | 'pricing'
 
 function Dashboard() {
@@ -75,45 +67,26 @@ function Dashboard() {
       case 'churn-intervention':return <ChurnIntervention />
       case 'alert-settings':    return <AlertSettings />
       case 'automated-dunning': return <AutomatedDunning />
-      case 'live-feed':         return <LiveFeed />
-      case 'n8n-automation':    return <N8nAutomation />
-      case 'revenue-analyzer':  return <RevenueAnalyzer />
-      case 'user-settings':     return <UserSettings />
       case 'pricing':           return <Pricing />
       default:                  return <CommandCenter />
     }
   }
 
-  const closeSidebarOnMobile = () => {
-    if (window.innerWidth <= 768) setSidebarOpen(false)
-  }
-
-  const handleNav = (s: Section) => {
-    setActiveSection(s)
-    closeSidebarOnMobile()
-  }
-
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg-primary)' }}>
-      {/* Mobile backdrop */}
-      <div
-        className={`sidebar-backdrop${sidebarOpen ? ' open' : ''}`}
-        onClick={() => setSidebarOpen(false)}
-      />
-
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-primary)' }}>
       <Sidebar
         activeSection={activeSection}
-        setActiveSection={handleNav}
+        setActiveSection={setActiveSection}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <TopBar
           activeSection={activeSection}
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           onHelpOpen={() => openHelp()}
         />
-        <main className="responsive-main" style={{ flex: 1, overflow: 'auto' }}>
+        <main style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
           <div className="slide-in">
             {renderSection()}
           </div>
