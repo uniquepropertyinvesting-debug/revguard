@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { apiGuard } from '@/lib/apiGuard'
 import { logInfo, logError } from '@/lib/logger'
+import { recordAuditEvent } from '@/lib/db'
 
 const CHILD_TABLES = [
   'alerts',
@@ -46,6 +47,15 @@ export async function POST(req: NextRequest) {
 
   const userClient = await createServerClient()
   const adminClient = createClient(url, serviceKey, { auth: { persistSession: false } })
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || ''
+  await recordAuditEvent({
+    userId,
+    action: 'account_deletion_requested',
+    resourceType: 'user',
+    resourceId: userId,
+    ipAddress: ip,
+  })
 
   try {
     for (const table of CHILD_TABLES) {

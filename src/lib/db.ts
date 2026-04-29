@@ -10,6 +10,34 @@ async function authDb() {
   return await createAuthClient()
 }
 
+// --- Audit Log ---
+/**
+ * Records a sensitive action for compliance. Best-effort; failures are
+ * swallowed so audit issues never block the underlying request.
+ */
+export async function recordAuditEvent(params: {
+  userId: string
+  action: string
+  resourceType?: string
+  resourceId?: string
+  details?: Record<string, unknown>
+  ipAddress?: string
+}) {
+  try {
+    const db = serviceDb()
+    await db.from('audit_log').insert({
+      user_id: params.userId,
+      action: params.action,
+      resource_type: params.resourceType ?? '',
+      resource_id: params.resourceId ?? '',
+      details: params.details ?? {},
+      ip_address: params.ipAddress ?? '',
+    })
+  } catch {
+    // intentional: audit failure must not break the user-facing request
+  }
+}
+
 // --- Users ---
 export async function upsertUser(id: string, email: string, name?: string) {
   const db = serviceDb()

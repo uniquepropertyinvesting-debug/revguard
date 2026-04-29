@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiGuard } from '@/lib/apiGuard'
 import { logInfo, logError } from '@/lib/logger'
+import { recordAuditEvent } from '@/lib/db'
 
 const TABLES = [
   'users',
@@ -60,6 +61,13 @@ export async function GET(req: NextRequest) {
     }
 
     logInfo('gdpr_export_completed', { userId })
+    await recordAuditEvent({
+      userId,
+      action: 'data_exported',
+      resourceType: 'user',
+      resourceId: userId,
+      ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '',
+    })
 
     return new NextResponse(JSON.stringify(result, null, 2), {
       headers: {

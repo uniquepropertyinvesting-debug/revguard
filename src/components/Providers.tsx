@@ -3,6 +3,7 @@
 import { ReactNode } from 'react'
 import { AuthProvider } from '@/modules/auth/components/AuthProvider'
 import { ThemeProvider } from '@/context/ThemeContext'
+import CookieBanner from '@/components/CookieBanner'
 
 interface ProvidersProps {
   children: ReactNode
@@ -11,7 +12,10 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <ThemeProvider>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        {children}
+        <CookieBanner />
+      </AuthProvider>
     </ThemeProvider>
   )
 }
