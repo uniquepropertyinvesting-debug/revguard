@@ -10,11 +10,19 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-      // Best-effort client error report; backend logger handles structured server errors.
-      fetch('/api/health', { method: 'GET' }).catch(() => {})
-    }
     console.error('[client_error]', error)
+    if (typeof window === 'undefined') return
+    fetch('/api/errors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        digest: error.digest,
+        url: window.location.href,
+      }),
+    }).catch(() => {})
   }, [error])
 
   return (

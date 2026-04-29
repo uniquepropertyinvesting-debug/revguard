@@ -31,10 +31,15 @@ export async function GET() {
   return NextResponse.json(
     {
       status: allOk ? 'healthy' : 'degraded',
+      version: process.env.RELEASE_VERSION || 'dev',
+      environment: process.env.NODE_ENV || 'development',
       timestamp: new Date().toISOString(),
       uptimeMs: Date.now() - start,
       checks,
     },
-    { status: allOk ? 200 : 503 },
+    {
+      status: allOk ? 200 : 503,
+      headers: { 'Cache-Control': 'no-store' },
+    },
   )
 }
