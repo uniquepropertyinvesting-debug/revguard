@@ -1,11 +1,14 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { getAlertSettings, saveAlertSettings } from '@/lib/db'
 import { Resend } from 'resend'
-import { getVerifiedUserId } from '@/lib/serverAuth'
+import { apiGuard } from '@/lib/apiGuard'
+import { logError } from '@/lib/logger'
 
 export async function GET(req: NextRequest) {
+  const guard = await apiGuard(req, { scope: 'alert_settings_read', max: 60, windowMs: 60_000 })
+  if (!guard.ok) return guard.response
   try {
-    const userId = (await getVerifiedUserId(req)) ?? 'default'
+    const userId = guard.userId ?? 'default'
     const settings = await getAlertSettings(userId)
     if (!settings) {
       return NextResponse.json({
@@ -28,16 +31,19 @@ export async function GET(req: NextRequest) {
       emailMinAmount: settings.email_min_amount || 0,
     })
   } catch (err: unknown) {
+    logError('alert_settings_failed', undefined, err)
     const message = err instanceof Error ? err.message : 'DB error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await apiGuard(req, { scope: 'alert_settings_write', max: 20, windowMs: 60_000, requireAuth: true })
+  if (!guard.ok) return guard.response
   try {
     const body = await req.json()
     const { notifyEmail, resendApiKey, ...prefs } = body
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? 'default'
+    const verifiedUserId = guard.userId!
 
     if (resendApiKey) {
       try {
@@ -63,15 +69,18 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
+    logError('alert_settings_failed', undefined, err)
     const message = err instanceof Error ? err.message : 'DB error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
 export async function PUT(req: NextRequest) {
+  const guard = await apiGuard(req, { scope: 'alert_settings_test_email', max: 5, windowMs: 60_000, requireAuth: true })
+  if (!guard.ok) return guard.response
   try {
     await req.json()
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? 'default'
+    const verifiedUserId = guard.userId!
     const settings = await getAlertSettings(verifiedUserId)
     const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
     const toEmail = settings?.notify_email
@@ -102,6 +111,7 @@ export async function PUT(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true, id: data?.id })
   } catch (err: unknown) {
+    logError('alert_settings_test_email_failed', undefined, err)
     const message = err instanceof Error ? err.message : 'Email error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

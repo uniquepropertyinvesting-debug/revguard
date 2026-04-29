@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripeForUser } from '@/lib/stripe'
-import { getVerifiedUserId } from '@/lib/serverAuth'
+import { apiGuard } from '@/lib/apiGuard'
+import { logError } from '@/lib/logger'
 import Stripe from 'stripe'
 
 async function getStripeContext(stripe: Stripe): Promise<string> {
@@ -104,8 +105,9 @@ async function getStripeContext(stripe: Stripe): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = await getVerifiedUserId(req)
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const guard = await apiGuard(req, { scope: 'ai_chat', max: 20, windowMs: 60_000, requireAuth: true })
+  if (!guard.ok) return guard.response
+  const userId = guard.userId!
 
   try {
     const { messages } = await req.json()
@@ -149,6 +151,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ content })
   } catch (err: unknown) {
+    logError('ai_chat_failed', { userId }, err)
     const message = err instanceof Error ? err.message : 'AI error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
