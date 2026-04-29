@@ -17,8 +17,19 @@ interface HealthResponse {
   checks: Record<string, HealthCheck>
 }
 
+interface Incident {
+  id: string
+  monitor_name: string
+  status: string
+  severity: string
+  started_at: string
+  resolved_at: string | null
+  summary: string
+}
+
 export default function StatusPage() {
   const [data, setData] = useState<HealthResponse | null>(null)
+  const [incidents, setIncidents] = useState<Incident[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -27,10 +38,15 @@ export default function StatusPage() {
 
     async function load() {
       try {
-        const res = await fetch('/api/health', { cache: 'no-store' })
-        const json = (await res.json()) as HealthResponse
+        const [healthRes, incidentsRes] = await Promise.all([
+          fetch('/api/health', { cache: 'no-store' }),
+          fetch('/api/incidents', { cache: 'no-store' }),
+        ])
+        const health = (await healthRes.json()) as HealthResponse
+        const incidentsJson = (await incidentsRes.json()) as { incidents?: Incident[] }
         if (!cancelled) {
-          setData(json)
+          setData(health)
+          setIncidents(incidentsJson.incidents || [])
           setError(null)
         }
       } catch (e) {
@@ -159,6 +175,73 @@ export default function StatusPage() {
             ))}
           </div>
         )}
+
+        <div style={{ marginTop: 32 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+            Recent incidents (30 days)
+          </h2>
+          {incidents.length === 0 ? (
+            <div
+              style={{
+                background: '#141b2d',
+                border: '1px solid #1e2d4a',
+                borderRadius: 12,
+                padding: 20,
+                fontSize: 13,
+                color: '#94a3b8',
+                textAlign: 'center',
+              }}
+            >
+              No incidents reported.
+            </div>
+          ) : (
+            <div
+              style={{
+                background: '#141b2d',
+                border: '1px solid #1e2d4a',
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}
+            >
+              {incidents.map((inc, i) => {
+                const resolved = Boolean(inc.resolved_at)
+                return (
+                  <div
+                    key={inc.id}
+                    style={{
+                      padding: '16px 20px',
+                      borderBottom: i < incidents.length - 1 ? '1px solid #1e2d4a' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: resolved ? '#10b981' : '#f59e0b',
+                          }}
+                        />
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>{inc.monitor_name}</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: resolved ? '#10b981' : '#f59e0b', textTransform: 'uppercase', fontWeight: 600 }}>
+                        {resolved ? 'Resolved' : inc.status}
+                      </span>
+                    </div>
+                    {inc.summary && (
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>{inc.summary}</div>
+                    )}
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                      Started {new Date(inc.started_at).toLocaleString()}
+                      {inc.resolved_at && ` · Resolved ${new Date(inc.resolved_at).toLocaleString()}`}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         <div style={{ marginTop: 32, fontSize: 12, color: '#64748b', textAlign: 'center' }}>
           Page refreshes every 30 seconds.
