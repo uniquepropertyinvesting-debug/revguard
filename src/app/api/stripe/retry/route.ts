@@ -1,25 +1,19 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { getStripeForUser } from '@/lib/stripe'
 import { logRecoveryAction, createAlert } from '@/lib/db'
-import { rateLimit, rateLimitHeaders } from '@/lib/rateLimit'
-import { getVerifiedUserId } from '@/lib/serverAuth'
+import { apiGuard } from '@/lib/apiGuard'
+import { logError } from '@/lib/logger'
+import { validateBody, isString } from '@/lib/validate'
 
 export async function POST(req: NextRequest) {
+  const guard = await apiGuard(req, { scope: 'stripe_retry', max: 10, windowMs: 60_000, requireAuth: true })
+  if (!guard.ok) return guard.response
+  const verifiedUserId = guard.userId!
   try {
-    const { invoiceId } = await req.json()
-    const verifiedUserId = (await getVerifiedUserId(req)) ?? undefined
-    if (!invoiceId) {
-      return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
-    }
-
-    // 10 retries per user per minute — prevents Stripe fee abuse
-    const rl = rateLimit('retry', verifiedUserId || req.ip || 'anon', { max: 10, windowMs: 60_000 })
-    if (!rl.ok) {
-      return NextResponse.json(
-        { error: 'Too many retry requests — please wait a minute' },
-        { status: 429, headers: rateLimitHeaders(rl) }
-      )
-    }
+    const body = await req.json()
+    const validation = validateBody(body, { invoiceId: isString })
+    if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 })
+    const { invoiceId } = validation.value
 
     const stripe = await getStripeForUser(verifiedUserId)
 
@@ -55,11 +49,10 @@ export async function POST(req: NextRequest) {
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Stripe error'
-
-    // Log the failed retry attempt
+    logError('stripe_retry_failed', { userId: verifiedUserId }, err)
     try {
-      const body = await (err as any)?.raw ? JSON.parse('{}') : {}
       await logRecoveryAction({
+        userId: verifiedUserId,
         invoiceId: 'unknown',
         amount: 0,
         currency: 'USD',

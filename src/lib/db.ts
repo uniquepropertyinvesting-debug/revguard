@@ -77,6 +77,22 @@ export async function saveWebhookEvent(stripeEventId: string, eventType: string,
   return data?.id
 }
 
+/** Returns true if a webhook with this Stripe event ID was already recorded. */
+export async function isWebhookEventProcessed(stripeEventId: string): Promise<boolean> {
+  const db = serviceDb()
+  const { data } = await db
+    .from('webhook_events')
+    .select('id')
+    .eq('stripe_event_id', stripeEventId)
+    .maybeSingle()
+  return !!data
+}
+
+export async function markWebhookEventProcessed(stripeEventId: string) {
+  const db = serviceDb()
+  await db.from('webhook_events').update({ processed: true }).eq('stripe_event_id', stripeEventId)
+}
+
 export async function getWebhookEvents(userId?: string, limit = 50) {
   const db = userId ? await authDb() : serviceDb()
   let query = db.from('webhook_events').select('*').order('created_at', { ascending: false }).limit(limit)

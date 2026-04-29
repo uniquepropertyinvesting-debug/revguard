@@ -38,6 +38,51 @@ export default function DataProtection() {
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const res = await authFetch('/api/gdpr/export')
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `revguard-data-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (confirmText !== 'DELETE MY ACCOUNT') return
+    setDeleting(true)
+    try {
+      const res = await authFetch('/api/gdpr/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE MY ACCOUNT' }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Deletion failed')
+      }
+      window.location.href = '/'
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Deletion failed')
+      setDeleting(false)
+    }
+  }
 
   useEffect(() => {
     authFetch('/api/data-protection')
@@ -169,6 +214,84 @@ export default function DataProtection() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* GDPR / Data Rights */}
+      <div className="card" style={{ padding: '20px' }}>
+        <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '6px' }}>Your Data Rights (GDPR / CCPA)</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          Export a complete copy of your data, or permanently delete your account and all associated records.
+        </div>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            style={{
+              padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: exporting ? 'wait' : 'pointer',
+              background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.35)',
+            }}
+          >
+            {exporting ? 'Preparing export...' : 'Download My Data (JSON)'}
+          </button>
+          <button
+            onClick={() => setDeleteOpen(true)}
+            style={{
+              padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)',
+            }}
+          >
+            Delete My Account
+          </button>
+        </div>
+
+        {deleteOpen && (
+          <div style={{
+            marginTop: 16, padding: 16, borderRadius: 10,
+            background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)',
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>This is permanent.</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
+              All your alerts, dunning sequences, recovery logs, Stripe connection, and account access will be
+              deleted immediately and cannot be recovered. Type <strong>DELETE MY ACCOUNT</strong> below to confirm.
+            </div>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="DELETE MY ACCOUNT"
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 6, fontSize: 13, marginBottom: 10,
+                background: 'var(--bg-secondary, #0a0e1a)', color: 'var(--text-primary, #fff)',
+                border: '1px solid var(--border, #1f2937)',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleDelete}
+                disabled={deleting || confirmText !== 'DELETE MY ACCOUNT'}
+                style={{
+                  padding: '8px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                  cursor: confirmText === 'DELETE MY ACCOUNT' && !deleting ? 'pointer' : 'not-allowed',
+                  background: confirmText === 'DELETE MY ACCOUNT' ? '#ef4444' : 'rgba(239,68,68,0.3)',
+                  color: '#fff', border: 'none',
+                  opacity: confirmText === 'DELETE MY ACCOUNT' && !deleting ? 1 : 0.6,
+                }}
+              >
+                {deleting ? 'Deleting...' : 'Confirm permanent deletion'}
+              </button>
+              <button
+                onClick={() => { setDeleteOpen(false); setConfirmText('') }}
+                disabled={deleting}
+                style={{
+                  padding: '8px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border, #1f2937)',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

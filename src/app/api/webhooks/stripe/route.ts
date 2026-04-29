@@ -1,7 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server'
 import Stripe from 'stripe'
-import { saveWebhookEvent, createAlert, logRecoveryAction } from '@/lib/db'
+import { saveWebhookEvent, createAlert, logRecoveryAction, isWebhookEventProcessed, markWebhookEventProcessed } from '@/lib/db'
 import { getStripeForUser, getWebhookSecretForUser } from '@/lib/stripe'
+import { logError, logInfo } from '@/lib/logger'
 
 async function sendAlertEmail(alertType: string, title: string, message: string, severity: string, amount?: number) {
   try {
@@ -34,6 +35,11 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : 'Webhook verification failed'
     console.error('Webhook signature verification failed:', message)
     return NextResponse.json({ error: message }, { status: 400 })
+  }
+
+  if (await isWebhookEventProcessed(event.id)) {
+    logInfo('webhook_duplicate_skipped', { eventId: event.id, type: event.type })
+    return NextResponse.json({ received: true, duplicate: true })
   }
 
   await saveWebhookEvent(event.id, event.type, event, userId)
@@ -143,8 +149,9 @@ export async function POST(req: NextRequest) {
       default:
         break
     }
+    await markWebhookEventProcessed(event.id)
   } catch (err) {
-    console.error('Error processing webhook event:', err)
+    logError('webhook_processing_failed', { eventId: event.id, type: event.type }, err)
   }
 
   return NextResponse.json({ received: true })
