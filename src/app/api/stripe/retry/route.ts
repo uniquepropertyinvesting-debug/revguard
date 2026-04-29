@@ -17,8 +17,13 @@ export async function POST(req: NextRequest) {
 
     const stripe = await getStripeForUser(verifiedUserId)
 
-    // Attempt to pay the invoice now via Stripe
-    const result = await stripe.invoices.pay(invoiceId)
+    // Idempotency key: scoped per user+invoice+day. Within 24h Stripe returns
+    // the cached response, preventing accidental double-charges from rapid
+    // double-clicks. A new day gives a fresh key for legitimate later retries.
+    const day = new Date().toISOString().slice(0, 10)
+    const idempotencyKey = `retry:${verifiedUserId}:${invoiceId}:${day}`
+
+    const result = await stripe.invoices.pay(invoiceId, undefined, { idempotencyKey })
     const amount = (result.amount_paid || 0) / 100
 
     // Log the successful recovery to DB

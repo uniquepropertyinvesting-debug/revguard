@@ -14,9 +14,9 @@ export async function GET() {
     try {
       const client = createClient(url, anonKey, { auth: { persistSession: false } })
       const { error } = await client.from('users').select('id', { head: true, count: 'exact' }).limit(0)
-      checks.database = { ok: !error, latencyMs: Date.now() - t0, error: error?.message }
-    } catch (err) {
-      checks.database = { ok: false, error: err instanceof Error ? err.message : 'unknown' }
+      checks.database = { ok: !error, latencyMs: Date.now() - t0, error: error ? 'query_failed' : undefined }
+    } catch {
+      checks.database = { ok: false, error: 'connection_failed' }
     }
   } else {
     checks.database = { ok: false, error: 'env_missing' }

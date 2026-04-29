@@ -328,6 +328,31 @@ export async function getDunningSequenceDue(now?: string) {
   return data || []
 }
 
+/**
+ * Returns true if any dunning email was sent to this customer email within
+ * the throttle window. Prevents blasting a customer who has multiple failing
+ * invoices in flight simultaneously.
+ */
+export async function wasDunningEmailSentRecently(
+  customerEmail: string,
+  windowHours = 12,
+): Promise<boolean> {
+  const db = serviceDb()
+  const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString()
+  const { data } = await db
+    .from('dunning_sequences')
+    .select('id')
+    .eq('customer_email', customerEmail)
+    .gte('last_email_sent_at', cutoff)
+    .limit(1)
+  return (data?.length ?? 0) > 0
+}
+
+export async function rescheduleDunningSequence(id: string, nextDueAt: string) {
+  const db = serviceDb()
+  await db.from('dunning_sequences').update({ next_email_due_at: nextDueAt }).eq('id', id)
+}
+
 export async function advanceDunningStep(id: string, nextDueAt: string | null) {
   const db = serviceDb()
   const now = new Date().toISOString()

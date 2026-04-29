@@ -11,6 +11,8 @@ import {
   getAlertSettings,
   logRecoveryAction,
   createAlert,
+  wasDunningEmailSentRecently,
+  rescheduleDunningSequence,
 } from '@/lib/db'
 import { apiGuard } from '@/lib/apiGuard'
 import { getVerifiedUserId } from '@/lib/serverAuth'
@@ -287,7 +289,23 @@ export async function POST(req: NextRequest) {
           : null
 
         let emailSent = false
-        let emailError = null
+        let emailError: string | null = null
+
+        // Per-recipient throttle: avoid blasting a customer with multiple
+        // failing invoices in the same window. Reschedule (don't advance) so
+        // the sequence retries after the throttle window clears.
+        if (await wasDunningEmailSentRecently(seq.customer_email, 12)) {
+          const retryAt = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
+          await rescheduleDunningSequence(seq.id, retryAt)
+          results.push({
+            sequenceId: seq.id,
+            customerEmail: seq.customer_email,
+            step: seq.step,
+            throttled: true,
+            nextDueAt: retryAt,
+          })
+          continue
+        }
 
         if (resendKey) {
           try {
