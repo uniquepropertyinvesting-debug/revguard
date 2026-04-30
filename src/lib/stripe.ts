@@ -40,3 +40,35 @@ export function safeStripeError(err: unknown, fallback = 'Stripe request failed'
   }
   return fallback
 }
+
+/**
+ * Retries a Stripe call with exponential backoff for transient failures
+ * (rate limits, connection drops, 5xx). Permanent errors (auth, invalid
+ * request, card errors) bubble immediately so callers can react.
+ */
+export async function withStripeRetry<T>(
+  fn: () => Promise<T>,
+  opts: { maxAttempts?: number; baseDelayMs?: number } = {},
+): Promise<T> {
+  const maxAttempts = opts.maxAttempts ?? 4
+  const baseDelay = opts.baseDelayMs ?? 250
+  let lastErr: unknown
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      const retryable =
+        err instanceof Stripe.errors.StripeRateLimitError ||
+        err instanceof Stripe.errors.StripeConnectionError ||
+        err instanceof Stripe.errors.StripeAPIError
+      if (!retryable || attempt === maxAttempts) throw err
+
+      const jitter = Math.random() * baseDelay
+      const delay = baseDelay * 2 ** (attempt - 1) + jitter
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+  throw lastErr
+}
