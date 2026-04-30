@@ -27,20 +27,39 @@ Set these in your hosting provider (Vercel → Project Settings → Environment 
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | From Supabase dashboard |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | From Supabase dashboard |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | From Supabase dashboard. Server-only. |
-| `ENCRYPTION_KEY` | yes | 32+ random bytes. `openssl rand -hex 32` |
+| `REVGUARD_ENCRYPTION_KEY` | yes | 32-byte hex key for encrypting customer Stripe secrets at rest. Generate with `openssl rand -hex 32`. **Back this up — losing it makes encrypted DB rows unreadable.** |
 | `OPENAI_API_KEY` | optional | Required only for AI assistant |
 | `SENTRY_DSN` | recommended | Activates error monitoring |
 | `LOG_WEBHOOK_URL` | optional | Generic JSON webhook (Logtail, etc.) |
 | `RELEASE_VERSION` | optional | e.g. `1.0.0`. Tags Sentry events. |
-| `NEXT_PUBLIC_APP_URL` | yes | `https://revguard.io` (your domain) |
+| `NEXT_PUBLIC_APP_URL` | yes | Your live URL. Use the Vercel-issued URL (e.g. `https://revguard.vercel.app`) until you buy a domain. |
 
 ---
 
-## 3. DNS records (the part that gates email deliverability)
+## 3. Publishing without a custom domain (interim launch)
+
+You can go live today on Vercel's free subdomain. Steps:
+
+1. Push the repo to GitHub.
+2. Vercel → New Project → Import the repo.
+3. Vercel auto-detects Next.js. Add the env vars from section 2 in the import screen.
+4. Click Deploy. You get `https://<project>.vercel.app` in ~2 minutes.
+5. Set `NEXT_PUBLIC_APP_URL` to that exact URL and redeploy once.
+
+**Limits while on a Vercel subdomain (no custom domain):**
+- Resend will send email but from `onboarding@resend.dev` until you verify your own domain. Fine for testing, not for customer dunning.
+- Stripe webhook URL becomes `https://<project>.vercel.app/api/webhooks/stripe` — this works in Stripe live and test mode.
+- Skip section 4 below until you have a domain.
+
+When you buy the domain later, add it in Vercel → Domains, update DNS, and update `NEXT_PUBLIC_APP_URL`. No code changes needed.
+
+---
+
+## 4. DNS records (only when you buy a domain — gates email deliverability)
 
 After buying your domain, add these records at your registrar. Without them dunning emails land in spam.
 
-### 3a. Resend (sender authentication)
+### 4a. Resend (sender authentication)
 
 1. Resend dashboard → Domains → Add `revguard.io`.
 2. Resend gives you 3 records. Add them at your registrar:
@@ -49,23 +68,24 @@ After buying your domain, add these records at your registrar. Without them dunn
    - `TXT _dmarc` → `v=DMARC1; p=quarantine; rua=mailto:postmaster@revguard.io`
 3. Wait for verification (5–30 min). Resend marks the domain green when ready.
 
-### 3b. App domain → Vercel
+### 4b. App domain → Vercel
 
 - `A @` → Vercel's IP (Vercel will provide on domain add)
 - `CNAME www` → `cname.vercel-dns.com`
 
 ---
 
-## 4. Supabase configuration
+## 5. Supabase configuration
 
-- Settings → Database → enable **Point-in-Time Recovery** (Pro plan)
-- Authentication → URL Configuration → set Site URL to your domain
+- Settings → Database → enable **Point-in-Time Recovery** (Pro plan, optional until paying customers)
+- Authentication → URL Configuration → set Site URL to your live URL (Vercel subdomain or custom domain)
 - Authentication → Email Templates → confirm "magic link" template is **disabled**; we use password auth only
 - Authentication → Providers → ensure **Confirm email** is OFF (per project policy)
+- Database → Tables → confirm RLS is **ON** for all 13 public tables (verified at last build)
 
 ---
 
-## 5. Stripe (your customers' Stripe accounts)
+## 6. Stripe (your customers' Stripe accounts)
 
 Customers connect their own Stripe accounts via the in-app onboarding. They paste:
 - Stripe secret key (`sk_live_...`)
@@ -73,7 +93,7 @@ Customers connect their own Stripe accounts via the in-app onboarding. They past
 
 Webhook endpoint they configure in their Stripe dashboard:
 ```
-https://revguard.io/api/webhooks/stripe
+https://<your-vercel-subdomain-or-domain>/api/webhooks/stripe
 ```
 
 Events to subscribe to:
@@ -85,12 +105,12 @@ Events to subscribe to:
 
 ---
 
-## 6. Pre-launch verification checklist
+## 7. Pre-launch verification checklist
 
 Run through these before pointing customers at the app:
 
-- [ ] `https://revguard.io/api/health` returns `{"status":"healthy"}`
-- [ ] `https://revguard.io/status` shows all green dots
+- [ ] `<your-url>/api/health` returns `{"status":"healthy"}`
+- [ ] `<your-url>/status` shows all green dots
 - [ ] Sentry dashboard receives a test event (trigger from `/api/errors` or visit the broken-route test)
 - [ ] BetterStack monitor pings `/api/health` every 60s and alerts on 503
 - [ ] Sign up a new account → onboarding completes → dashboard loads
@@ -99,14 +119,14 @@ Run through these before pointing customers at the app:
 - [ ] Click "delete my account" in test account → all data gone, auth user removed
 - [ ] Run `npm run build` locally — no errors
 - [ ] CI green on `main` branch
-- [ ] `https://revguard.io` has TLS, A+ on https://observatory.mozilla.org
+- [ ] Live URL has TLS (Vercel issues automatically), A+ on https://observatory.mozilla.org
 - [ ] CSP active (no console errors in browser dev tools)
 - [ ] Cookie banner appears on first visit
 - [ ] Privacy + terms pages reviewed by legal counsel
 
 ---
 
-## 7. Operational runbook
+## 8. Operational runbook
 
 **On-call alerts**
 - Sentry: any error event triggers email
@@ -127,11 +147,11 @@ Run through these before pointing customers at the app:
 
 ---
 
-## 8. Going live
+## 9. Going live
 
 1. Push to `main` → Vercel auto-deploys
-2. Smoke test with the checklist above
-3. Flip your DNS A record to point to Vercel (you can stage on `staging.revguard.io` first)
+2. Smoke test with the checklist in section 7
+3. (When you have a custom domain) Flip DNS to Vercel; you can stage on a subdomain first
 4. Announce launch only after 24h of clean Sentry + uptime data
 
-**You're production-ready when every box in section 6 is ticked.**
+**You're production-ready when every box in section 7 is ticked.**
