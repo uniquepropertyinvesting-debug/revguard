@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
           <table cellpadding="0" cellspacing="0">
             <tr>
               <td style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:10px;padding:1px;">
-                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://revguard.io'}"
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://rev-guard.com'}"
                    style="display:block;background:#141b2d;border-radius:9px;padding:10px 24px;color:#f1f5f9;text-decoration:none;font-size:14px;font-weight:700;">
                   View Dashboard →
                 </a>
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
 </html>`
 
     const { data, error } = await resend.emails.send({
-      from: 'RevGuard Alerts <alerts@revguard.io>',
+      from: 'RevGuard Alerts <alerts@rev-guard.com>',
       to: [toEmail],
       subject: `[RevGuard] ${severityLabel}: ${title}`,
       html,

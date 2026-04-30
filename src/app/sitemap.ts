@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://revguard.io'
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://rev-guard.com'
   const now = new Date()
   return [
     { url: `${base}/`, lastModified: now, changeFrequency: 'weekly', priority: 1.0 },

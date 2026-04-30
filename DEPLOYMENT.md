@@ -8,7 +8,7 @@ This is the single source of truth for taking RevGuard from "code complete" to "
 
 | Service | Purpose | Plan | Link |
 |---|---|---|---|
-| Domain registrar | `revguard.io` (or your choice) | Any | Namecheap, Cloudflare Registrar |
+| Domain registrar | `rev-guard.com` | Any | Cloudflare Registrar, Porkbun |
 | Vercel | Hosting | Hobby (free) for soft launch | https://vercel.com |
 | Supabase | DB + auth (already created) | Pro ($25/mo) for backups | https://supabase.com |
 | Resend | Transactional email | Free 3K/mo, then $20/mo | https://resend.com |
@@ -61,11 +61,11 @@ After buying your domain, add these records at your registrar. Without them dunn
 
 ### 4a. Resend (sender authentication)
 
-1. Resend dashboard → Domains → Add `revguard.io`.
+1. Resend dashboard → Domains → Add `rev-guard.com`.
 2. Resend gives you 3 records. Add them at your registrar:
    - `TXT @` → SPF record provided by Resend
    - `CNAME` → DKIM record (`resend._domainkey`)
-   - `TXT _dmarc` → `v=DMARC1; p=quarantine; rua=mailto:postmaster@revguard.io`
+   - `TXT _dmarc` → `v=DMARC1; p=quarantine; rua=mailto:postmaster@rev-guard.com`
 3. Wait for verification (5–30 min). Resend marks the domain green when ready.
 
 ### 4b. App domain → Vercel

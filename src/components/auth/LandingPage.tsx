@@ -597,7 +597,7 @@ export default function LandingPage() {
               {['#ef4444', '#f59e0b', '#10b981'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c }} />)}
             </div>
             <div style={{ flex: 1, background: 'var(--bg-card)', borderRadius: '6px', padding: '4px 12px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'left' }}>
-              app.revguard.io/dashboard
+              app.rev-guard.com/dashboard
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>

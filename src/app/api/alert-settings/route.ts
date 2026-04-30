@@ -99,7 +99,7 @@ export async function PUT(req: NextRequest) {
 
     const resend = new Resend(resendKey)
     const { data, error } = await resend.emails.send({
-      from: 'RevGuard Alerts <alerts@revguard.io>',
+      from: 'RevGuard Alerts <alerts@rev-guard.com>',
       to: [toEmail],
       subject: '[RevGuard] Test Alert — Email Alerts Working!',
       html: `

@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
             })
 
             const { error } = await resend.emails.send({
-              from: 'RevGuard Billing <billing@revguard.io>',
+              from: 'RevGuard Billing <billing@rev-guard.com>',
               to: [seq.customer_email],
               subject: stepConfig.subject,
               html,

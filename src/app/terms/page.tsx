@@ -71,7 +71,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="12. Contact">
-          Questions: <a href="mailto:legal@revguard.io" style={{ color: '#06b6d4' }}>legal@revguard.io</a>
+          Questions: <a href="mailto:legal@rev-guard.com" style={{ color: '#06b6d4' }}>legal@rev-guard.com</a>
         </Section>
       </div>
     </div>

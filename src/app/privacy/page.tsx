@@ -39,7 +39,7 @@ export default function PrivacyPage() {
 
         <Section title="5. Your Rights (GDPR & CCPA)">
           You may export all your data at any time from Settings, or request deletion of your account and all
-          associated data. Deletion is permanent and immediate. You may also contact us at privacy@revguard.io.
+          associated data. Deletion is permanent and immediate. You may also contact us at privacy@rev-guard.com.
         </Section>
 
         <Section title="6. Cookies">
@@ -58,7 +58,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="9. Contact">
-          Questions: <a href="mailto:privacy@revguard.io" style={{ color: '#06b6d4' }}>privacy@revguard.io</a>
+          Questions: <a href="mailto:privacy@rev-guard.com" style={{ color: '#06b6d4' }}>privacy@rev-guard.com</a>
         </Section>
       </div>
     </div>
