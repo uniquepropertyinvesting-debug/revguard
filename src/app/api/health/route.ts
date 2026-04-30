@@ -26,6 +26,35 @@ export async function GET() {
     ok: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
   }
 
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (url && serviceKey) {
+    try {
+      const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+      const { data } = await admin
+        .from('cron_runs')
+        .select('ran_at, status')
+        .eq('job', 'drain_emails')
+        .order('ran_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!data) {
+        checks.email_drain = { ok: false, error: 'never_run' }
+      } else {
+        const ageMs = Date.now() - new Date(data.ran_at).getTime()
+        const ageMinutes = Math.round(ageMs / 60_000)
+        const stale = ageMs > 15 * 60_000
+        const failed = data.status !== 'ok'
+        checks.email_drain = {
+          ok: !stale && !failed,
+          latencyMs: ageMinutes,
+          error: failed ? 'last_run_failed' : stale ? `stale_${ageMinutes}m` : undefined,
+        }
+      }
+    } catch {
+      checks.email_drain = { ok: false, error: 'check_failed' }
+    }
+  }
+
   const allOk = Object.values(checks).every((c) => c.ok)
 
   return NextResponse.json(
