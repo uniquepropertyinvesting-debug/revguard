@@ -25,6 +25,7 @@ const sectionTitles: Record<Section, { title: string; subtitle: string; helpSect
   'alert-settings':    { title: 'Alert Settings',            subtitle: 'Configure email alerts powered by Resend',      helpSection: 'getting-started' },
   'automated-dunning': { title: 'Automated Dunning',          subtitle: '3-step email recovery sequence for failed invoices', helpSection: 'getting-started' },
   'pricing':           { title: 'Pricing',                    subtitle: 'Plans and billing',                              helpSection: 'getting-started' },
+  'support-agent':     { title: 'AI Support Agent',            subtitle: 'Get instant product help or escalate to a human', helpSection: 'getting-started' },
 }
 
 export default function TopBar({ activeSection, onMenuToggle, onHelpOpen }: TopBarProps) {

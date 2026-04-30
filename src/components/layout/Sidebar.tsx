@@ -54,6 +54,7 @@ const NAV_GROUPS_BASE = [
     label: 'CUSTOMERS & PLATFORM',
     items: [
       { id: 'ai-assistant', label: 'AI Revenue Assistant', icon: '🤖', badge: 'AI' },
+      { id: 'support-agent', label: 'AI Support Agent', icon: '💬', badge: 'AI' },
       { id: 'integrations', label: 'Integrations', icon: '🔗' },
       { id: 'data-protection', label: 'Data Protection', icon: '🔒' },
       { id: 'alert-settings', label: 'Alert Settings', icon: '📧' },

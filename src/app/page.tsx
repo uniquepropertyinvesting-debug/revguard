@@ -11,6 +11,7 @@ import RevenueRecovery from '@/components/dashboard/RevenueRecovery'
 import ROIEngine from '@/components/dashboard/ROIEngine'
 import Integrations from '@/components/dashboard/Integrations'
 import AIAssistant from '@/components/dashboard/AIAssistant'
+import SupportAgent from '@/components/dashboard/SupportAgent'
 import DataProtection from '@/components/dashboard/DataProtection'
 import RevenueLossIntel from '@/components/dashboard/RevenueLossIntel'
 import ChurnIntervention from '@/components/dashboard/ChurnIntervention'
@@ -38,6 +39,7 @@ export type Section =
   | 'alert-settings'
   | 'automated-dunning'
   | 'pricing'
+  | 'support-agent'
 
 function Dashboard() {
   const [activeSection, setActiveSection] = useState<Section>('command-center')
@@ -68,6 +70,7 @@ function Dashboard() {
       case 'alert-settings':    return <AlertSettings />
       case 'automated-dunning': return <AutomatedDunning />
       case 'pricing':           return <Pricing />
+      case 'support-agent':     return <SupportAgent />
       default:                  return <CommandCenter />
     }
   }
