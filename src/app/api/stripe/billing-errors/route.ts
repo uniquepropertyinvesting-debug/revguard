@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       const errorType = detectErrorType({
         status: inv.status,
         attemptCount: inv.attempt_count,
-        discount: !!inv.discount,
+        discount: Array.isArray(inv.discounts) ? inv.discounts.length > 0 : !!inv.discounts,
         duplicateFlag: isDuplicate,
       })
 

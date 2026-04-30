@@ -1,7 +1,7 @@
 import Stripe from 'stripe'
 import { getStripeConnection } from '@/lib/db'
 
-const STRIPE_API_VERSION = '2025-01-27.acacia' as const
+const STRIPE_API_VERSION = '2026-04-22.dahlia' as const
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
   apiVersion: STRIPE_API_VERSION,

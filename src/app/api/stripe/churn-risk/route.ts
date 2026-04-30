@@ -109,7 +109,10 @@ export async function GET(req: NextRequest) {
           status: sub.status,
           cancelAtPeriodEnd: sub.cancel_at_period_end,
           daysActive,
-          currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+          currentPeriodEnd: (() => {
+            const periodEnd = sub.items?.data?.[0]?.current_period_end
+            return periodEnd ? new Date(periodEnd * 1000).toISOString() : new Date().toISOString()
+          })(),
         }
       })
       .sort((a, b) => b.score - a.score)
