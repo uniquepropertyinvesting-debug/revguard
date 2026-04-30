@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createHmac, timingSafeEqual as nodeTimingSafeEqual } from 'node:crypto'
 import { logError, logInfo } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -19,11 +20,39 @@ interface BetterStackPayload {
   event?: string
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
+function safeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  try {
+    return nodeTimingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'))
+  } catch {
+    return false
+  }
+}
+
+function safeEqualString(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let mismatch = 0
   for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return mismatch === 0
+}
+
+/**
+ * Verify the request body against the configured secret. Prefers HMAC (x-webhook-signature
+ * header containing a hex SHA-256 digest of the raw body) and falls back to a constant-time
+ * compare on a static secret header for legacy / static-secret BetterStack configs.
+ */
+export function verifySignature(rawBody: string, headers: Headers, secret: string): boolean {
+  const sigHeader = headers.get('x-webhook-signature') || headers.get('x-signature') || ''
+  if (sigHeader) {
+    const provided = sigHeader.startsWith('sha256=') ? sigHeader.slice(7) : sigHeader
+    const expected = createHmac('sha256', secret).update(rawBody).digest('hex')
+    return safeEqualHex(provided.toLowerCase(), expected)
+  }
+  const staticSecret = headers.get('x-webhook-secret') || ''
+  if (staticSecret) {
+    return safeEqualString(staticSecret, secret)
+  }
+  return false
 }
 
 export async function POST(req: NextRequest) {
@@ -33,14 +62,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'not_configured' }, { status: 503 })
   }
 
-  const provided = req.headers.get('x-webhook-secret') || ''
-  if (!timingSafeEqual(provided, expected)) {
+  const rawBody = await req.text()
+
+  if (!verifySignature(rawBody, req.headers, expected)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
   let body: BetterStackPayload
   try {
-    body = await req.json()
+    body = JSON.parse(rawBody) as BetterStackPayload
   } catch {
     return NextResponse.json({ ok: false, error: 'invalid_json' }, { status: 400 })
   }

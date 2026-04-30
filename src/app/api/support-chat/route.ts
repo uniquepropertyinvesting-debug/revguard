@@ -24,7 +24,7 @@ Style:
 - If the user asks for live revenue numbers, churn, or specific Stripe data, redirect them to the AI Revenue Assistant page (which has live Stripe access) and don't fabricate numbers.`
 
 interface IncomingMessage {
-  role: 'user' | 'assistant' | 'system'
+  role: 'user' | 'assistant'
   content: string
 }
 
@@ -33,7 +33,7 @@ function isValidMessage(m: unknown): m is IncomingMessage {
   const v = m as Record<string, unknown>
   return (
     typeof v.role === 'string'
-    && ['user', 'assistant', 'system'].includes(v.role)
+    && ['user', 'assistant'].includes(v.role)
     && typeof v.content === 'string'
     && v.content.length > 0
     && v.content.length <= 8000

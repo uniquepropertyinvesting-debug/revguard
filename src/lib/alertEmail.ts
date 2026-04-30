@@ -1,7 +1,8 @@
 import { Resend } from 'resend'
 import { getAlertSettings } from '@/lib/db'
 import { rateLimit } from '@/lib/rateLimit'
-import { logError } from '@/lib/logger'
+import { logError, logInfo } from '@/lib/logger'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export interface SendAlertEmailInput {
   alertType: string
@@ -28,7 +29,7 @@ const TYPE_TO_PREF: Record<string, string> = {
   payment_recovered: 'email_payment_recovered',
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -105,6 +106,53 @@ function renderEmailHtml(opts: { title: string; message: string; severity: strin
 </html>`
 }
 
+async function enqueuePending(input: SendAlertEmailInput, lastError: string, attempts = 0): Promise<void> {
+  try {
+    const supabase = createServiceClient()
+    const backoffMs = Math.min(60_000 * Math.pow(2, attempts), 30 * 60_000)
+    await supabase.from('pending_emails').insert({
+      user_id: input.userId || null,
+      alert_type: input.alertType,
+      title: input.title,
+      message: input.message,
+      severity: input.severity,
+      amount: input.amount ?? null,
+      attempts,
+      last_error: lastError.slice(0, 500),
+      next_attempt_at: new Date(Date.now() + backoffMs).toISOString(),
+    })
+  } catch (err) {
+    logError('pending_email_enqueue_failed', { alertType: input.alertType }, err)
+  }
+}
+
+interface SendCoreOpts {
+  resendKey: string
+  toEmail: string
+  title: string
+  message: string
+  severity: string
+  amount?: number
+}
+
+async function sendViaResend(opts: SendCoreOpts): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
+  const severityLabel = opts.severity === 'critical' ? 'CRITICAL' : opts.severity === 'success' ? 'RECOVERED' : 'WARNING'
+  const html = renderEmailHtml({ title: opts.title, message: opts.message, severity: opts.severity, amount: opts.amount })
+  try {
+    const resend = new Resend(opts.resendKey)
+    const { data, error } = await resend.emails.send({
+      from: 'RevGuard Alerts <alerts@rev-guard.com>',
+      to: [opts.toEmail],
+      subject: `[RevGuard] ${severityLabel}: ${opts.title}`,
+      html,
+    })
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, id: data?.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Resend exception' }
+  }
+}
+
 export async function sendAlertEmail(input: SendAlertEmailInput): Promise<SendAlertEmailResult> {
   try {
     const { alertType, title, message, severity, amount, userId } = input
@@ -133,25 +181,99 @@ export async function sendAlertEmail(input: SendAlertEmailInput): Promise<SendAl
       }
     }
 
-    const severityLabel = severity === 'critical' ? 'CRITICAL' : severity === 'success' ? 'RECOVERED' : 'WARNING'
-    const html = renderEmailHtml({ title, message, severity, amount })
+    const result = await sendViaResend({ resendKey, toEmail, title, message, severity, amount })
 
-    const resend = new Resend(resendKey)
-    const { data, error } = await resend.emails.send({
-      from: 'RevGuard Alerts <alerts@rev-guard.com>',
-      to: [toEmail],
-      subject: `[RevGuard] ${severityLabel}: ${title}`,
-      html,
-    })
-
-    if (error) {
-      logError('alert_email_send_failed', { alertType, userId }, error)
-      return { ok: false, error: error.message }
+    if (!result.ok) {
+      logError('alert_email_send_failed', { alertType, userId, error: result.error })
+      await enqueuePending(input, result.error, 0)
+      return { ok: false, error: result.error }
     }
 
-    return { ok: true, id: data?.id }
+    return { ok: true, id: result.id }
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : 'Email error'
     logError('alert_email_exception', { alertType: input.alertType, userId: input.userId }, err)
-    return { ok: false, error: err instanceof Error ? err.message : 'Email error' }
+    await enqueuePending(input, errMsg, 0)
+    return { ok: false, error: errMsg }
   }
+}
+
+interface DrainResult {
+  attempted: number
+  delivered: number
+  failed: number
+  skipped: number
+}
+
+const MAX_ATTEMPTS = 6
+
+/**
+ * Drain pending email queue. Called by /api/cron/drain-emails on a schedule.
+ * Picks up to `limit` rows whose next_attempt_at <= now, retries each one,
+ * marks delivered rows as sent and bumps next_attempt_at on failures.
+ */
+export async function drainPendingEmails(limit = 25): Promise<DrainResult> {
+  const supabase = createServiceClient()
+  const now = new Date().toISOString()
+
+  const { data: rows, error } = await supabase
+    .from('pending_emails')
+    .select('id, user_id, alert_type, title, message, severity, amount, attempts')
+    .is('sent_at', null)
+    .lte('next_attempt_at', now)
+    .order('next_attempt_at', { ascending: true })
+    .limit(limit)
+
+  if (error || !rows) {
+    if (error) logError('pending_email_drain_query_failed', {}, error)
+    return { attempted: 0, delivered: 0, failed: 0, skipped: 0 }
+  }
+
+  let delivered = 0
+  let failed = 0
+  let skipped = 0
+
+  for (const row of rows) {
+    const settings = row.user_id ? await getAlertSettings(row.user_id) : null
+    const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
+    const toEmail = settings?.notify_email || process.env.ALERT_EMAIL
+    if (!resendKey || !toEmail) {
+      skipped++
+      continue
+    }
+
+    const result = await sendViaResend({
+      resendKey,
+      toEmail,
+      title: row.title,
+      message: row.message,
+      severity: row.severity,
+      amount: row.amount ?? undefined,
+    })
+
+    const nextAttempts = (row.attempts || 0) + 1
+    if (result.ok) {
+      delivered++
+      await supabase.from('pending_emails').update({ sent_at: new Date().toISOString(), attempts: nextAttempts }).eq('id', row.id)
+    } else if (nextAttempts >= MAX_ATTEMPTS) {
+      failed++
+      await supabase.from('pending_emails').update({
+        attempts: nextAttempts,
+        last_error: result.error.slice(0, 500),
+        sent_at: new Date().toISOString(),
+      }).eq('id', row.id)
+      logError('pending_email_max_attempts', { id: row.id, alertType: row.alert_type })
+    } else {
+      failed++
+      const backoffMs = Math.min(60_000 * Math.pow(2, nextAttempts), 30 * 60_000)
+      await supabase.from('pending_emails').update({
+        attempts: nextAttempts,
+        last_error: result.error.slice(0, 500),
+        next_attempt_at: new Date(Date.now() + backoffMs).toISOString(),
+      }).eq('id', row.id)
+    }
+  }
+
+  logInfo('pending_email_drain', { attempted: rows.length, delivered, failed, skipped })
+  return { attempted: rows.length, delivered, failed, skipped }
 }

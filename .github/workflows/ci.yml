@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
+      - name: Test
+        run: npm test
+
       - name: Build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}

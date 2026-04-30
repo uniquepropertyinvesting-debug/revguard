@@ -125,16 +125,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'messages must be an array of 1-50 items' }, { status: 400 })
     }
     const validMessages = messages.every(
-      (m): m is { role: string; content: string } =>
+      (m): m is { role: 'user' | 'assistant'; content: string } =>
         m && typeof m === 'object'
         && typeof (m as any).role === 'string'
-        && ['user', 'assistant', 'system'].includes((m as any).role)
+        && ['user', 'assistant'].includes((m as any).role)
         && typeof (m as any).content === 'string'
         && (m as any).content.length <= 8000
     )
     if (!validMessages) {
-      return NextResponse.json({ error: 'invalid message format' }, { status: 400 })
+      return NextResponse.json({ error: 'invalid message format — only user/assistant roles allowed' }, { status: 400 })
     }
+    const sanitizedMessages = (messages as Array<{ role: 'user' | 'assistant'; content: string }>)
+      .map(m => ({ role: m.role, content: m.content }))
 
     const stripe = await getStripeForUser(userId)
     const stripeContext = await getStripeContext(stripe, userId)
@@ -150,7 +152,7 @@ export async function POST(req: NextRequest) {
       model: process.env.OPENAI_MODEL || 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages,
+        ...sanitizedMessages,
       ],
     }
 
