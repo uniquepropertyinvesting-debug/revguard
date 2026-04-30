@@ -3,15 +3,11 @@ import Stripe from 'stripe'
 import { saveWebhookEvent, createAlert, logRecoveryAction, isWebhookEventProcessed, markWebhookEventProcessed } from '@/lib/db'
 import { getStripeForUser, getWebhookSecretForUser } from '@/lib/stripe'
 import { logError, logInfo } from '@/lib/logger'
+import { sendAlertEmail as sendAlertEmailDirect } from '@/lib/alertEmail'
 
-async function sendAlertEmail(alertType: string, title: string, message: string, severity: string, amount?: number) {
+async function sendAlertEmail(alertType: string, title: string, message: string, severity: string, amount?: number, userId?: string) {
   try {
-    const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'
-    await fetch(`${base}/api/alerts/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ alertType, title, message, severity, amount, internalKey: process.env.SUPABASE_SERVICE_ROLE_KEY }),
-    })
+    await sendAlertEmailDirect({ alertType, title, message, severity, amount, userId })
   } catch { /* email is best-effort */ }
 }
 
@@ -54,7 +50,7 @@ export async function POST(req: NextRequest) {
         const title = 'Payment Failed'
         const message = `Payment of $${amount.toFixed(2)} failed. Reason: ${pi.last_payment_error?.message || 'Unknown'}`
         await createAlert({ userId, type: 'payment_failed', severity, title, message, metadata: { paymentIntentId: pi.id, amount, customerId: pi.customer } })
-        sendAlertEmail('payment_failed', title, message, severity, amount)
+        sendAlertEmail('payment_failed', title, message, severity, amount, userId)
         break
       }
 
@@ -65,7 +61,7 @@ export async function POST(req: NextRequest) {
         const title2 = 'Invoice Payment Failed'
         const msg2 = `Invoice #${inv.number || inv.id.slice(0, 8)} for $${amount.toFixed(2)} failed after ${inv.attempt_count} attempt(s)`
         await createAlert({ userId, type: 'invoice_failed', severity: severity2, title: title2, message: msg2, metadata: { invoiceId: inv.id, amount, customerId: inv.customer, attempts: inv.attempt_count } })
-        sendAlertEmail('invoice_failed', title2, msg2, severity2, amount)
+        sendAlertEmail('invoice_failed', title2, msg2, severity2, amount, userId)
         await logRecoveryAction({
           userId,
           invoiceId: inv.id,
@@ -86,7 +82,7 @@ export async function POST(req: NextRequest) {
           const recTitle = 'Payment Recovered'
           const recMsg = `Invoice of $${amount.toFixed(2)} successfully recovered after ${inv.attempt_count} attempt(s)`
           await createAlert({ userId, type: 'payment_recovered', severity: 'success', title: recTitle, message: recMsg, metadata: { invoiceId: inv.id, amount, customerId: inv.customer } })
-          sendAlertEmail('payment_recovered', recTitle, recMsg, 'success', amount)
+          sendAlertEmail('payment_recovered', recTitle, recMsg, 'success', amount, userId)
           await logRecoveryAction({
             userId,
             invoiceId: inv.id,

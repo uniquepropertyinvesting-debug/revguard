@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripeForUser, safeStripeError } from '@/lib/stripe'
 import { getVerifiedUserId } from '@/lib/serverAuth'
 import { logError } from '@/lib/logger'
+import { getOrSetCached } from '@/lib/stripeCache'
 
 async function paginate<T>(iter: AsyncIterable<T>, maxItems = 2000): Promise<T[]> {
   const results: T[] = []
@@ -17,11 +18,15 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const stripe = await getStripeForUser(userId)
   try {
-    const [charges, customers, subscriptions] = await Promise.all([
-      paginate(stripe.charges.list({ limit: 100 })),
-      paginate(stripe.customers.list({ limit: 100 })),
-      paginate(stripe.subscriptions.list({ limit: 100, status: 'all' })),
-    ])
+    const [charges, customers, subscriptions] = await getOrSetCached(
+      `stripe_overview:${userId}`,
+      () => Promise.all([
+        paginate(stripe.charges.list({ limit: 100 })),
+        paginate(stripe.customers.list({ limit: 100 })),
+        paginate(stripe.subscriptions.list({ limit: 100, status: 'all' })),
+      ]),
+      30_000,
+    )
 
     const now = Date.now()
     const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000

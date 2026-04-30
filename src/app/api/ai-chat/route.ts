@@ -2,16 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripeForUser } from '@/lib/stripe'
 import { apiGuard } from '@/lib/apiGuard'
 import { logError } from '@/lib/logger'
+import { getOrSetCached } from '@/lib/stripeCache'
 import Stripe from 'stripe'
 
-async function getStripeContext(stripe: Stripe): Promise<string> {
+async function loadStripeData(stripe: Stripe) {
+  return Promise.all([
+    stripe.charges.list({ limit: 50 }),
+    stripe.subscriptions.list({ limit: 50, status: 'all' }),
+    stripe.customers.list({ limit: 50 }),
+    stripe.invoices.list({ limit: 50 }),
+  ])
+}
+
+async function getStripeContext(stripe: Stripe, userId: string): Promise<string> {
   try {
-    const [charges, subscriptions, customers, invoices] = await Promise.all([
-      stripe.charges.list({ limit: 50 }),
-      stripe.subscriptions.list({ limit: 50, status: 'all' }),
-      stripe.customers.list({ limit: 50 }),
-      stripe.invoices.list({ limit: 50 }),
-    ])
+    const [charges, subscriptions, customers, invoices] = await getOrSetCached(
+      `stripe_ctx:${userId}`,
+      () => loadStripeData(stripe),
+      30_000,
+    )
 
     const now = Date.now()
     const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
@@ -128,7 +137,7 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = await getStripeForUser(userId)
-    const stripeContext = await getStripeContext(stripe)
+    const stripeContext = await getStripeContext(stripe, userId)
 
     const openaiApiKey = process.env.OPENAI_API_KEY
     if (!openaiApiKey) {

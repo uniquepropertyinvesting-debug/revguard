@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { authFetch } from '@/lib/auth'
+import { renderMarkdownBlock } from '@/lib/renderMarkdown'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -60,18 +61,7 @@ export default function AIAssistant() {
     }
   }
 
-  const renderContent = (text: string) => {
-    return text.split('\n').map((line, i) => {
-      const parts = line.split(/\*\*(.+?)\*\*/g)
-      return (
-        <div key={i} style={{ marginBottom: line === '' ? '8px' : '2px' }}>
-          {parts.map((part, j) =>
-            j % 2 === 1 ? <strong key={j}>{part}</strong> : <span key={j}>{part}</span>
-          )}
-        </div>
-      )
-    })
-  }
+  const renderContent = (text: string) => renderMarkdownBlock(text)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: 'calc(100vh - 160px)' }}>
