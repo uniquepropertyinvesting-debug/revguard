@@ -45,11 +45,19 @@ export function useAuthProvider(): AuthContextType {
 
   useEffect(() => {
     const supabase = createClient()
+    let settled = false
 
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
+    const finish = (u: SupabaseUser | null) => {
+      settled = true
       setUser(u ? mapUser(u) : null)
       setIsLoading(false)
-    })
+    }
+
+    supabase.auth.getUser()
+      .then(({ data: { user: u } }) => { if (!settled) finish(u) })
+      .catch(() => { if (!settled) finish(null) })
+
+    const timeout = setTimeout(() => { if (!settled) finish(null) }, 3000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ? mapUser(session.user) : null)
@@ -57,6 +65,7 @@ export function useAuthProvider(): AuthContextType {
     })
 
     return () => {
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
   }, [])
