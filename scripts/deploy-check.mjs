@@ -16,6 +16,7 @@ const REQUIRED = {
   SUPABASE_SERVICE_ROLE_KEY: "Server-side DB writes, webhooks, drain job",
   REVGUARD_ENCRYPTION_KEY: "Encrypts customer Stripe keys at rest",
   NEXT_PUBLIC_APP_URL: "Links in dunning emails and alerts",
+  CRON_SECRET: "Authorizes the scheduled email-drain job (without it, queued emails never send)",
 };
 
 const RECOMMENDED = {
@@ -23,7 +24,6 @@ const RECOMMENDED = {
   STRIPE_WEBHOOK_SECRET: "Verifies inbound Stripe webhooks",
   RESEND_API_KEY: "Sends alert and dunning emails",
   BETTERSTACK_WEBHOOK_SECRET: "Verifies BetterStack incident webhooks",
-  CRON_SECRET: "Authorizes scheduled drain-emails job",
   SENTRY_DSN: "Server-side error reporting",
   LOG_WEBHOOK_URL: "Log forwarding",
 };

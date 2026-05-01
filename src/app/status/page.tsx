@@ -27,9 +27,40 @@ interface Incident {
   summary: string
 }
 
+interface CronJobStatus {
+  job: string
+  lastRunAt: string | null
+  status: 'ok' | 'error' | null
+  processed: number | null
+  durationMs: number | null
+  error: string | null
+}
+
+const JOB_LABELS: Record<string, { title: string; description: string }> = {
+  drain_emails: {
+    title: 'Email queue drain',
+    description: 'Sends queued failure / recovery alerts to customers.',
+  },
+}
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return 'never'
+  const diffMs = Date.now() - new Date(iso).getTime()
+  if (diffMs < 0) return new Date(iso).toLocaleString()
+  const sec = Math.floor(diffMs / 1000)
+  if (sec < 60) return `${sec}s ago`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const day = Math.floor(hr / 24)
+  return `${day}d ago`
+}
+
 export default function StatusPage() {
   const [data, setData] = useState<HealthResponse | null>(null)
   const [incidents, setIncidents] = useState<Incident[]>([])
+  const [cronJobs, setCronJobs] = useState<CronJobStatus[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -38,15 +69,18 @@ export default function StatusPage() {
 
     async function load() {
       try {
-        const [healthRes, incidentsRes] = await Promise.all([
+        const [healthRes, incidentsRes, cronRes] = await Promise.all([
           fetch('/api/health', { cache: 'no-store' }),
           fetch('/api/incidents', { cache: 'no-store' }),
+          fetch('/api/status/cron', { cache: 'no-store' }),
         ])
         const health = (await healthRes.json()) as HealthResponse
         const incidentsJson = (await incidentsRes.json()) as { incidents?: Incident[] }
+        const cronJson = (await cronRes.json()) as { jobs?: CronJobStatus[] }
         if (!cancelled) {
           setData(health)
           setIncidents(incidentsJson.incidents || [])
+          setCronJobs(cronJson.jobs || [])
           setError(null)
         }
       } catch (e) {
@@ -175,6 +209,74 @@ export default function StatusPage() {
             ))}
           </div>
         )}
+
+        <div style={{ marginTop: 32 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+            Scheduled jobs
+          </h2>
+          <div
+            style={{
+              background: '#141b2d',
+              border: '1px solid #1e2d4a',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            {cronJobs.map((job, i) => {
+              const meta = JOB_LABELS[job.job] || { title: job.job, description: '' }
+              const hasRun = !!job.lastRunAt
+              const ageMs = job.lastRunAt ? Date.now() - new Date(job.lastRunAt).getTime() : null
+              const stale = ageMs !== null && ageMs > 60 * 60_000
+              const errored = job.status === 'error'
+              const dotColor = errored ? '#ef4444' : !hasRun || stale ? '#f59e0b' : '#10b981'
+              return (
+                <div
+                  key={job.job}
+                  style={{
+                    padding: '16px 20px',
+                    borderBottom: i < cronJobs.length - 1 ? '1px solid #1e2d4a' : 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor }} />
+                      <span style={{ fontSize: 14, fontWeight: 600 }}>{meta.title}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                      {!hasRun
+                        ? 'Has never run'
+                        : errored
+                          ? `Failed · ${formatRelative(job.lastRunAt)}`
+                          : `Ran ${formatRelative(job.lastRunAt)}`}
+                    </div>
+                  </div>
+                  {meta.description && (
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginLeft: 20, marginBottom: 4 }}>
+                      {meta.description}
+                    </div>
+                  )}
+                  {hasRun && (
+                    <div style={{ fontSize: 11, color: '#64748b', marginLeft: 20 }}>
+                      {job.processed !== null && <>Processed {job.processed}{job.processed === 1 ? ' item' : ' items'} · </>}
+                      {job.durationMs !== null && <>{job.durationMs}ms · </>}
+                      {new Date(job.lastRunAt!).toLocaleString()}
+                    </div>
+                  )}
+                  {errored && job.error && (
+                    <div style={{ fontSize: 11, color: '#fca5a5', marginLeft: 20, marginTop: 4 }}>
+                      Error: {job.error}
+                    </div>
+                  )}
+                  {!hasRun && (
+                    <div style={{ fontSize: 11, color: '#f59e0b', marginLeft: 20, marginTop: 4 }}>
+                      The scheduled job has not executed yet — check that <code style={{ background: '#1e2d4a', padding: '1px 5px', borderRadius: 3 }}>CRON_SECRET</code> is set and your scheduler is configured.
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
         <div style={{ marginTop: 32 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
