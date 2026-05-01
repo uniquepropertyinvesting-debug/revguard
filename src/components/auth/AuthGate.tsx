@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/modules/auth/hooks/useAuth'
 import { createClient } from '@/lib/supabase/client'
 import LandingPage from '@/components/auth/LandingPage'
-import OnboardingFlow from '@/components/auth/OnboardingFlow'
+import OnboardingFlow, { OnboardingProfile } from '@/components/auth/OnboardingFlow'
 
 interface AuthGateProps {
   children: React.ReactNode
@@ -59,10 +59,19 @@ export default function AuthGate({ children }: AuthGateProps) {
     checkOnboarded()
   }, [isLoading, isAuthenticated, user])
 
-  const handleOnboardingComplete = async () => {
+  const handleOnboardingComplete = async (profile: OnboardingProfile) => {
     if (user) {
       const supabase = createClient()
-      await supabase.from('users').update({ onboarded: true }).eq('id', user.id)
+      const mrrNum = parseFloat(profile.mrr)
+      const churnNum = parseFloat(profile.churnRate)
+      await supabase.from('users').update({
+        onboarded: true,
+        company_name: profile.companyName.trim() || null,
+        company_size: profile.companySize || null,
+        industry: profile.industry || null,
+        mrr: Number.isFinite(mrrNum) ? mrrNum : 0,
+        churn_rate: Number.isFinite(churnNum) ? churnNum : 0,
+      }).eq('id', user.id)
     }
     setState('app')
   }
