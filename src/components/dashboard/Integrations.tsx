@@ -9,6 +9,18 @@ interface StripeConnectionStatus {
   connectedAt?: number
 }
 
+interface WebhookVerifyResult {
+  status: 'ok' | 'partial' | 'missing'
+  expectedUrl: string
+  secretConfigured: boolean
+  endpointFound: boolean
+  matchingEndpoint: { id: string; url: string; status: string; enabledEvents: string[]; livemode: boolean } | null
+  missingEvents: string[]
+  recentEventCount: number
+  lastEventAt: string | null
+  stripeError: string | null
+}
+
 const comingSoon = [
   {
     name: 'PayPal', icon: '🅿️', category: 'Payments', color: '#003087',
@@ -44,8 +56,8 @@ export default function Integrations() {
   const [webhookSecret, setWebhookSecret] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<WebhookVerifyResult | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -92,26 +104,31 @@ export default function Integrations() {
     }
   }
 
-  const handleTest = async () => {
-    if (!secretKey.startsWith('sk_')) {
-      setTestResult({ ok: false, message: 'Key must start with sk_live_ or sk_test_' })
-      return
-    }
-    setTesting(true)
-    setTestResult(null)
+  const handleVerify = async () => {
+    setVerifying(true)
+    setVerifyResult(null)
     try {
-      // Quick validation: hit our overview endpoint which uses the stored key
-      // For a new key being tested before saving, we test by trying to save temporarily
-      const res = await fetch('/api/stripe/overview')
-      if (res.ok) {
-        setTestResult({ ok: true, message: 'Stripe connection is working' })
+      const res = await authFetch('/api/stripe/webhook-verify')
+      const data = await res.json()
+      if (!res.ok) {
+        setVerifyResult({
+          status: 'missing', expectedUrl: '', secretConfigured: false,
+          endpointFound: false, matchingEndpoint: null, missingEvents: [],
+          recentEventCount: 0, lastEventAt: null,
+          stripeError: data.error || 'Verification failed',
+        })
       } else {
-        setTestResult({ ok: false, message: 'Could not reach Stripe — verify key is correct' })
+        setVerifyResult(data)
       }
     } catch {
-      setTestResult({ ok: false, message: 'Connection test failed' })
+      setVerifyResult({
+        status: 'missing', expectedUrl: '', secretConfigured: false,
+        endpointFound: false, matchingEndpoint: null, missingEvents: [],
+        recentEventCount: 0, lastEventAt: null,
+        stripeError: 'Network error',
+      })
     } finally {
-      setTesting(false)
+      setVerifying(false)
     }
   }
 
@@ -244,12 +261,6 @@ export default function Integrations() {
                     </div>
                   )}
 
-                  {testResult && (
-                    <div style={{ fontSize: '12px', color: testResult.ok ? '#10b981' : '#ef4444', marginBottom: '12px', padding: '8px 12px', background: testResult.ok ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', borderRadius: '6px', border: `1px solid ${testResult.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
-                      {testResult.ok ? '✓' : '✗'} {testResult.message}
-                    </div>
-                  )}
-
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button
                       className="btn-primary"
@@ -257,26 +268,88 @@ export default function Integrations() {
                       onClick={handleSave}
                       disabled={saving || !secretKey}
                     >
-                      {saving ? '⏳ Saving...' : '🔐 Save & Connect'}
-                    </button>
-                    <button
-                      className="btn-secondary"
-                      style={{ fontSize: '13px', padding: '8px 14px' }}
-                      onClick={handleTest}
-                      disabled={testing || !secretKey}
-                    >
-                      {testing ? 'Testing...' : 'Test Connection'}
+                      {saving ? 'Saving...' : 'Save & Connect'}
                     </button>
                     {showStripeForm && (
                       <button
                         className="btn-secondary"
                         style={{ fontSize: '13px', padding: '8px 14px' }}
-                        onClick={() => { setShowStripeForm(false); setSaveMsg(''); setTestResult(null) }}
+                        onClick={() => { setShowStripeForm(false); setSaveMsg('') }}
                       >
                         Cancel
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+
+              {stripeStatus?.connected && !showStripeForm && (
+                <div style={{ marginTop: '16px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: verifyResult ? '12px' : '0' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>End-to-end webhook check</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Lists your Stripe-side endpoints, confirms the signing secret matches, and reports any events received in the last 7 days.
+                      </div>
+                    </div>
+                    <button
+                      className="btn-secondary"
+                      style={{ fontSize: '12px', padding: '6px 14px', whiteSpace: 'nowrap' }}
+                      onClick={handleVerify}
+                      disabled={verifying}
+                    >
+                      {verifying ? 'Verifying...' : 'Verify webhook'}
+                    </button>
+                  </div>
+
+                  {verifyResult && (
+                    <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {verifyResult.stripeError && (
+                        <div style={{ color: '#ef4444', padding: '8px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                          Stripe API error: {verifyResult.stripeError}
+                        </div>
+                      )}
+
+                      <VerifyRow
+                        ok={verifyResult.secretConfigured}
+                        label="Webhook signing secret stored"
+                        detail={verifyResult.secretConfigured ? 'Saved (encrypted)' : 'Add a whsec_... secret above to verify signatures'}
+                      />
+                      <VerifyRow
+                        ok={verifyResult.endpointFound}
+                        label="Endpoint registered in Stripe"
+                        detail={verifyResult.endpointFound
+                          ? `${verifyResult.matchingEndpoint?.url} (${verifyResult.matchingEndpoint?.status})`
+                          : `No Stripe endpoint matches ${verifyResult.expectedUrl}`}
+                      />
+                      <VerifyRow
+                        ok={verifyResult.endpointFound && verifyResult.missingEvents.length === 0}
+                        label="Required events enabled"
+                        detail={verifyResult.endpointFound
+                          ? (verifyResult.missingEvents.length === 0
+                              ? 'All 6 required events are enabled'
+                              : `Missing: ${verifyResult.missingEvents.join(', ')}`)
+                          : 'Register the endpoint first'}
+                      />
+                      <VerifyRow
+                        ok={verifyResult.recentEventCount > 0}
+                        label="Events received recently"
+                        detail={verifyResult.recentEventCount > 0
+                          ? `${verifyResult.recentEventCount} event(s) in the last 7 days · last seen ${verifyResult.lastEventAt ? new Date(verifyResult.lastEventAt).toLocaleString() : 'unknown'}`
+                          : 'No events yet — trigger a test event from Stripe Dashboard → Webhooks → Send test'}
+                      />
+
+                      {!verifyResult.endpointFound && !verifyResult.stripeError && (
+                        <div style={{ padding: '10px 12px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '8px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                          To register the endpoint: in Stripe Dashboard → Developers → Webhooks → Add endpoint, paste{' '}
+                          <code style={{ background: 'rgba(59,130,246,0.15)', padding: '1px 5px', borderRadius: '3px', fontSize: '11px' }}>{verifyResult.expectedUrl}</code>,
+                          select the 6 required events, then copy the resulting{' '}
+                          <code style={{ background: 'rgba(59,130,246,0.15)', padding: '1px 5px', borderRadius: '3px', fontSize: '11px' }}>whsec_</code>{' '}
+                          signing secret into the form above.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -312,6 +385,21 @@ export default function Integrations() {
         </div>
       </div>
 
+    </div>
+  )
+}
+
+function VerifyRow({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
+  const color = ok ? '#10b981' : '#f59e0b'
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', background: 'var(--bg-secondary)', border: `1px solid ${ok ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`, borderRadius: '8px' }}>
+      <div style={{ width: 18, height: 18, borderRadius: '50%', background: color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0, marginTop: '1px' }}>
+        {ok ? '\u2713' : '!'}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', wordBreak: 'break-word' }}>{detail}</div>
+      </div>
     </div>
   )
 }
