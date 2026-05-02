@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiGuard } from '@/lib/apiGuard'
 import { createClient } from '@/lib/supabase/server'
+import { getAppSecret } from '@/lib/db'
 import { logError } from '@/lib/logger'
 
 const SYSTEM_PROMPT = `You are RevGuard Support, the friendly product support agent for the RevGuard Revenue Loss Prevention platform.
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     const validHistory = (history || []).filter(isValidMessage)
 
-    const openaiApiKey = process.env.OPENAI_API_KEY
+    const openaiApiKey = await getAppSecret('openai_api_key')
     if (!openaiApiKey) {
       return NextResponse.json({ error: 'AI not configured', conversationId }, { status: 503 })
     }

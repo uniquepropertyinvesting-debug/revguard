@@ -10,6 +10,35 @@ async function authDb() {
   return await createAuthClient()
 }
 
+// --- App Secrets (global, server-only) ---
+const appSecretCache = new Map<string, { value: string; expires: number }>()
+
+/**
+ * Fetches a globally-shared backend secret from the `app_secrets` table.
+ * Falls back to the matching environment variable so existing deploys keep
+ * working. Cached in-memory for 60s to avoid hammering the DB on hot paths.
+ */
+export async function getAppSecret(key: string): Promise<string | null> {
+  const cached = appSecretCache.get(key)
+  if (cached && cached.expires > Date.now()) return cached.value
+
+  try {
+    const db = serviceDb()
+    const { data } = await db.from('app_secrets').select('value').eq('key', key).maybeSingle()
+    if (data?.value) {
+      const value = decrypt(data.value)
+      appSecretCache.set(key, { value, expires: Date.now() + 60_000 })
+      return value
+    }
+  } catch {
+    // fall through to env
+  }
+
+  const envName = key.toUpperCase()
+  const envValue = process.env[envName]
+  return envValue || null
+}
+
 // --- Audit Log ---
 /**
  * Records a sensitive action for compliance. Best-effort; failures are

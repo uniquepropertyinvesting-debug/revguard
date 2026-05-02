@@ -3,6 +3,7 @@ import { getStripeForUser } from '@/lib/stripe'
 import { apiGuard } from '@/lib/apiGuard'
 import { logError } from '@/lib/logger'
 import { getOrSetCached } from '@/lib/stripeCache'
+import { getAppSecret } from '@/lib/db'
 import Stripe from 'stripe'
 
 async function loadStripeData(stripe: Stripe) {
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
     const stripe = await getStripeForUser(userId)
     const stripeContext = await getStripeContext(stripe, userId)
 
-    const openaiApiKey = process.env.OPENAI_API_KEY
+    const openaiApiKey = await getAppSecret('openai_api_key')
     if (!openaiApiKey) {
       return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
     }
