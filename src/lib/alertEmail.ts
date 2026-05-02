@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { getAlertSettings } from '@/lib/db'
+import { getAlertSettings, getAppSecret } from '@/lib/db'
 import { rateLimit } from '@/lib/rateLimit'
 import { logError, logInfo } from '@/lib/logger'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -163,8 +163,8 @@ export async function sendAlertEmail(input: SendAlertEmailInput): Promise<SendAl
     }
 
     const settings = userId ? await getAlertSettings(userId) : null
-    const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
-    const toEmail = settings?.notify_email || process.env.ALERT_EMAIL
+    const resendKey = settings?.resend_api_key || (await getAppSecret('resend_api_key')) || process.env.RESEND_API_KEY
+    const toEmail = settings?.notify_email || (await getAppSecret('alert_email')) || process.env.ALERT_EMAIL
 
     if (!resendKey || !toEmail) {
       return { ok: false, skipped: true, reason: 'No Resend API key or email configured' }
@@ -235,8 +235,8 @@ export async function drainPendingEmails(limit = 25): Promise<DrainResult> {
 
   for (const row of rows) {
     const settings = row.user_id ? await getAlertSettings(row.user_id) : null
-    const resendKey = settings?.resend_api_key || process.env.RESEND_API_KEY
-    const toEmail = settings?.notify_email || process.env.ALERT_EMAIL
+    const resendKey = settings?.resend_api_key || (await getAppSecret('resend_api_key')) || process.env.RESEND_API_KEY
+    const toEmail = settings?.notify_email || (await getAppSecret('alert_email')) || process.env.ALERT_EMAIL
     if (!resendKey || !toEmail) {
       skipped++
       continue
