@@ -3,7 +3,7 @@ import type { NextConfig } from 'next'
 const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   {
@@ -20,7 +20,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://images.pexels.com https://*.stripe.com",
       "connect-src 'self' https://api.stripe.com https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.resend.com https://*.ingest.sentry.io https://*.sentry.io",
       "frame-src https://js.stripe.com https://hooks.stripe.com",
-      "frame-ancestors 'none'",
+      "frame-ancestors *",
       "base-uri 'self'",
       "form-action 'self'",
     ].join('; '),
