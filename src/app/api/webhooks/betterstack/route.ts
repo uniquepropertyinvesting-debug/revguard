@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHmac, timingSafeEqual as nodeTimingSafeEqual } from 'node:crypto'
+import { getAppSecret } from '@/lib/db'
 import { logError, logInfo } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -56,7 +57,7 @@ export function verifySignature(rawBody: string, headers: Headers, secret: strin
 }
 
 export async function POST(req: NextRequest) {
-  const expected = process.env.BETTERSTACK_WEBHOOK_SECRET
+  const expected = (await getAppSecret('betterstack_webhook_secret')) || process.env.BETTERSTACK_WEBHOOK_SECRET
   if (!expected) {
     logError('betterstack_webhook_misconfigured', { reason: 'secret_missing' })
     return NextResponse.json({ ok: false, error: 'not_configured' }, { status: 503 })

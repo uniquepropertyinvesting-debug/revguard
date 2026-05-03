@@ -9,6 +9,27 @@ interface StripeConnectionStatus {
   connectedAt?: number
 }
 
+interface N8nConnectionStatus {
+  connected: boolean
+  instanceUrl?: string
+  hasApiKey?: boolean
+  hasWebhookSecret?: boolean
+  isActive?: boolean
+  lastHeartbeatAt?: string | null
+}
+
+interface N8nRun {
+  id: string
+  workflow_id: string
+  workflow_name: string
+  status: string
+  event_type: string | null
+  started_at: string
+  completed_at: string | null
+  duration_ms: number | null
+  error_message: string | null
+}
+
 interface WebhookVerifyResult {
   status: 'ok' | 'partial' | 'missing'
   expectedUrl: string
@@ -59,6 +80,36 @@ export default function Integrations() {
   const [verifying, setVerifying] = useState(false)
   const [verifyResult, setVerifyResult] = useState<WebhookVerifyResult | null>(null)
 
+  const [n8nStatus, setN8nStatus] = useState<N8nConnectionStatus | null>(null)
+  const [showN8nForm, setShowN8nForm] = useState(false)
+  const [n8nUrl, setN8nUrl] = useState('')
+  const [n8nApiKey, setN8nApiKey] = useState('')
+  const [n8nSecret, setN8nSecret] = useState('')
+  const [n8nSaving, setN8nSaving] = useState(false)
+  const [n8nMsg, setN8nMsg] = useState('')
+  const [n8nRuns, setN8nRuns] = useState<N8nRun[]>([])
+  const [n8nRunsLoading, setN8nRunsLoading] = useState(false)
+
+  const loadN8n = async () => {
+    try {
+      const r = await authFetch('/api/db/n8n-connect')
+      const data = await r.json()
+      setN8nStatus(data)
+      if (data?.connected) {
+        setN8nRunsLoading(true)
+        try {
+          const rr = await authFetch('/api/n8n/runs')
+          const rd = await rr.json()
+          setN8nRuns(rd.runs || [])
+        } finally {
+          setN8nRunsLoading(false)
+        }
+      }
+    } catch {
+      setN8nStatus({ connected: false })
+    }
+  }
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -70,7 +121,43 @@ export default function Integrations() {
       }
     }
     load()
+    loadN8n()
   }, [])
+
+  const handleN8nSave = async () => {
+    if (!n8nUrl) {
+      setN8nMsg('Instance URL is required')
+      return
+    }
+    setN8nSaving(true)
+    setN8nMsg('')
+    try {
+      const res = await authFetch('/api/db/n8n-connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instanceUrl: n8nUrl,
+          apiKey: n8nApiKey || undefined,
+          webhookSecret: n8nSecret || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowN8nForm(false)
+        setN8nUrl('')
+        setN8nApiKey('')
+        setN8nSecret('')
+        setN8nMsg('')
+        await loadN8n()
+      } else {
+        setN8nMsg(data.error || 'Failed to save')
+      }
+    } catch {
+      setN8nMsg('Network error — try again')
+    } finally {
+      setN8nSaving(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!secretKey.startsWith('sk_')) {
@@ -348,6 +435,188 @@ export default function Integrations() {
                           signing secret into the form above.
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* n8n — Workflow Automation */}
+      <div>
+        <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span className="badge-blue">AUTOMATION</span>
+          <span>n8n Workflow Integration</span>
+        </div>
+
+        <div className={`card ${n8nStatus?.connected ? 'glow-green' : ''}`} style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+            <div style={{ fontSize: '36px' }}>⚙️</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <div style={{ fontWeight: 700, fontSize: '18px' }}>n8n</div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Workflow Automation</span>
+                {n8nStatus?.connected
+                  ? <span className="badge-green" style={{ marginLeft: 'auto' }}>Connected</span>
+                  : <span style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '20px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>Not Connected</span>
+                }
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Stream n8n workflow run results into RevGuard for unified visibility. Failed runs auto-create alerts.
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '16px' }}>
+                {['Workflow Run Tracking', 'Failure Alerts', 'Heartbeat Monitoring', 'Event Forwarding'].map(f => (
+                  <span key={f} style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderRadius: '4px', border: '1px solid rgba(59,130,246,0.2)' }}>{f}</span>
+                ))}
+              </div>
+
+              {n8nStatus?.connected && !showN8nForm && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="pulse-dot" style={{ background: '#10b981' }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      {n8nStatus.instanceUrl}
+                      {n8nStatus.lastHeartbeatAt
+                        ? ` · Last seen ${new Date(n8nStatus.lastHeartbeatAt).toLocaleString()}`
+                        : ' · Awaiting first event'}
+                    </span>
+                  </div>
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: '12px', padding: '5px 12px', marginLeft: 'auto' }}
+                    onClick={() => {
+                      setShowN8nForm(true)
+                      setN8nUrl(n8nStatus.instanceUrl || '')
+                    }}
+                  >
+                    Update
+                  </button>
+                </div>
+              )}
+
+              {(!n8nStatus?.connected || showN8nForm) && (
+                <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-primary)' }}>
+                    {showN8nForm ? 'Update n8n Connection' : 'Connect Your n8n Instance'}
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+                      INSTANCE URL <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://n8n.example.com"
+                      value={n8nUrl}
+                      onChange={e => setN8nUrl(e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        color: 'var(--text-primary)', fontSize: '13px', fontFamily: 'monospace',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+                      API KEY <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="n8n_api_..."
+                      value={n8nApiKey}
+                      onChange={e => setN8nApiKey(e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        color: 'var(--text-primary)', fontSize: '13px', fontFamily: 'monospace',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+                      WEBHOOK SECRET <span style={{ color: 'var(--text-muted)' }}>(recommended)</span>
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Shared secret for incoming webhooks"
+                      value={n8nSecret}
+                      onChange={e => setN8nSecret(e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        color: 'var(--text-primary)', fontSize: '13px', fontFamily: 'monospace',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      In n8n, send POST to <code style={{ background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '10px' }}>/api/webhooks/n8n</code> with header <code style={{ background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '10px' }}>X-N8n-Signature: &lt;secret&gt;</code>
+                    </div>
+                  </div>
+
+                  {n8nMsg && (
+                    <div style={{ fontSize: '12px', color: '#ef4444', marginBottom: '12px', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      {n8nMsg}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      className="btn-primary"
+                      style={{ fontSize: '13px', padding: '8px 18px' }}
+                      onClick={handleN8nSave}
+                      disabled={n8nSaving || !n8nUrl}
+                    >
+                      {n8nSaving ? 'Saving...' : 'Save & Connect'}
+                    </button>
+                    {showN8nForm && (
+                      <button
+                        className="btn-secondary"
+                        style={{ fontSize: '13px', padding: '8px 14px' }}
+                        onClick={() => { setShowN8nForm(false); setN8nMsg('') }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {n8nStatus?.connected && !showN8nForm && (
+                <div style={{ marginTop: '4px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px' }}>
+                    Recent workflow runs
+                  </div>
+                  {n8nRunsLoading ? (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Loading...</div>
+                  ) : n8nRuns.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      No runs yet. Trigger a workflow in n8n to see it here.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {n8nRuns.slice(0, 8).map(run => {
+                        const ok = run.status === 'success'
+                        const color = ok ? '#10b981' : run.status === 'error' ? '#ef4444' : '#f59e0b'
+                        return (
+                          <div key={run.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px', fontSize: '12px' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {run.workflow_name || run.workflow_id}
+                              {run.error_message && <span style={{ color: '#ef4444', marginLeft: 6 }}>· {run.error_message}</span>}
+                            </div>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                              {new Date(run.started_at).toLocaleString()}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

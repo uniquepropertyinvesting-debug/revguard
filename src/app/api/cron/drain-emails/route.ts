@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { drainPendingEmails } from '@/lib/alertEmail'
+import { getAppSecret } from '@/lib/db'
 import { logError } from '@/lib/logger'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -28,11 +29,11 @@ async function recordCronRun(params: {
 /**
  * Cron-callable endpoint that drains the pending_emails queue.
  * Auth: requires the CRON_SECRET to be sent via the `Authorization: Bearer <secret>` header.
- * Configure your scheduler (Netlify Scheduled Functions, Supabase pg_cron, GitHub Actions, etc.)
- * to hit this endpoint every 1-5 minutes.
+ * Configure your scheduler (Vercel Cron, Supabase pg_cron, GitHub Actions, etc.)
+ * to hit this endpoint every 1-5 minutes. Vercel Cron is wired up in vercel.json.
  */
 export async function POST(req: NextRequest) {
-  const expected = process.env.CRON_SECRET
+  const expected = (await getAppSecret('cron_secret')) || process.env.CRON_SECRET
   if (!expected) {
     return NextResponse.json({ error: 'cron not configured' }, { status: 503 })
   }

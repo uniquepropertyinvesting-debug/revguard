@@ -420,3 +420,121 @@ export async function recoverDunningSequence(invoiceId: string) {
     recovered_at: new Date().toISOString(),
   }).eq('invoice_id', invoiceId)
 }
+
+// --- App Secrets management (admin) ---
+export async function listAppSecretKeys(): Promise<Array<{ key: string; updated_at: string }>> {
+  const db = serviceDb()
+  const { data } = await db.from('app_secrets').select('key, updated_at').order('key')
+  return data || []
+}
+
+export async function setAppSecret(key: string, value: string) {
+  const db = serviceDb()
+  const row = { key, value: encrypt(value), updated_at: new Date().toISOString() }
+  const { data: existing } = await db.from('app_secrets').select('key').eq('key', key).maybeSingle()
+  if (existing) {
+    await db.from('app_secrets').update(row).eq('key', key)
+  } else {
+    await db.from('app_secrets').insert(row)
+  }
+  appSecretCache.delete(key)
+}
+
+export async function deleteAppSecret(key: string) {
+  const db = serviceDb()
+  await db.from('app_secrets').delete().eq('key', key)
+  appSecretCache.delete(key)
+}
+
+// --- n8n Connections (multi-tenant) ---
+export async function saveN8nConnection(
+  userId: string,
+  instanceUrl: string,
+  apiKey?: string,
+  webhookSecret?: string,
+) {
+  const db = serviceDb()
+  const row = {
+    user_id: userId,
+    instance_url: instanceUrl,
+    api_key: apiKey ? encrypt(apiKey) : null,
+    webhook_secret: webhookSecret ? encrypt(webhookSecret) : null,
+    is_active: true,
+  }
+  const { data: existing } = await db.from('n8n_connections').select('id').eq('user_id', userId).maybeSingle()
+  if (existing) {
+    await db.from('n8n_connections').update(row).eq('id', existing.id)
+  } else {
+    await db.from('n8n_connections').insert(row)
+  }
+}
+
+export async function getN8nConnection(userId: string) {
+  const db = serviceDb()
+  const { data: row } = await db.from('n8n_connections').select('*').eq('user_id', userId).maybeSingle()
+  if (!row) return null
+  return {
+    ...row,
+    api_key: row.api_key ? decrypt(row.api_key) : null,
+    webhook_secret: row.webhook_secret ? decrypt(row.webhook_secret) : null,
+  }
+}
+
+export async function findN8nConnectionBySecret(secret: string) {
+  const db = serviceDb()
+  const { data: rows } = await db.from('n8n_connections').select('*').not('webhook_secret', 'is', null)
+  if (!rows) return null
+  for (const row of rows) {
+    try {
+      if (decrypt(row.webhook_secret) === secret) {
+        return { ...row, api_key: row.api_key ? decrypt(row.api_key) : null, webhook_secret: secret }
+      }
+    } catch { /* skip rows with bad ciphertext */ }
+  }
+  return null
+}
+
+export async function touchN8nHeartbeat(userId: string) {
+  const db = serviceDb()
+  await db.from('n8n_connections').update({ last_heartbeat_at: new Date().toISOString() }).eq('user_id', userId)
+}
+
+export async function recordN8nWorkflowRun(args: {
+  userId: string
+  workflowId: string
+  workflowName?: string
+  triggerType?: string
+  status: 'running' | 'success' | 'error'
+  eventType?: string
+  inputData?: Record<string, unknown>
+  outputData?: Record<string, unknown>
+  errorMessage?: string
+  durationMs?: number
+}) {
+  const db = serviceDb()
+  const completed = args.status === 'success' || args.status === 'error'
+  await db.from('n8n_workflow_runs').insert({
+    user_id: args.userId,
+    workflow_id: args.workflowId,
+    workflow_name: args.workflowName || '',
+    trigger_type: args.triggerType || 'webhook',
+    status: args.status,
+    event_type: args.eventType || null,
+    input_data: args.inputData || {},
+    output_data: args.outputData || {},
+    error_message: args.errorMessage || null,
+    duration_ms: args.durationMs ?? null,
+    completed_at: completed ? new Date().toISOString() : null,
+  })
+}
+
+export async function listN8nWorkflowRuns(userId: string, limit = 25) {
+  const db = serviceDb()
+  const { data } = await db
+    .from('n8n_workflow_runs')
+    .select('id, workflow_id, workflow_name, status, event_type, started_at, completed_at, duration_ms, error_message')
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false })
+    .limit(limit)
+  return data || []
+}
