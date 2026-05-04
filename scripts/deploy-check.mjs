@@ -81,8 +81,43 @@ function check(group, label, color) {
 
 const env = loadEnv();
 
+const DB_SECRET_ALIASES = {
+  CRON_SECRET: "cron_secret",
+  OPENAI_API_KEY: "openai_api_key",
+  RESEND_API_KEY: "resend_api_key",
+  STRIPE_SECRET_KEY: "stripe_secret_key",
+  STRIPE_WEBHOOK_SECRET: "stripe_webhook_secret",
+  BETTERSTACK_WEBHOOK_SECRET: "betterstack_webhook_secret",
+  SENTRY_DSN: "sentry_dsn",
+  LOG_WEBHOOK_URL: "log_webhook_url",
+};
+
+async function loadDbSecretKeys() {
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const service = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !anon || !service) return new Set();
+  try {
+    const res = await fetch(`${url}/rest/v1/app_secrets?select=key`, {
+      headers: { apikey: anon, Authorization: `Bearer ${service}` },
+    });
+    if (!res.ok) return new Set();
+    const rows = await res.json();
+    return new Set(rows.map((r) => r.key));
+  } catch {
+    return new Set();
+  }
+}
+
+const dbSecretKeys = await loadDbSecretKeys();
+for (const [envKey, dbKey] of Object.entries(DB_SECRET_ALIASES)) {
+  if (!env[envKey] && dbSecretKeys.has(dbKey)) {
+    env[envKey] = "[stored in app_secrets]";
+  }
+}
+
 console.log(`${BOLD}${BLUE}Deploy readiness check${RESET}`);
-console.log(`Reading from .env and process environment.`);
+console.log(`Reading from .env, process environment, and app_secrets table.`);
 
 const missingRequired = check(REQUIRED, "Required", RED);
 const missingRecommended = check(RECOMMENDED, "Recommended", YELLOW);
