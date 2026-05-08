@@ -29,18 +29,13 @@ export async function createClient() {
 export function createServiceClient() {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       cookies: {
         getAll() {
           return []
         },
         setAll() {},
-      },
-      global: {
-        headers: {
-          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-        },
       },
     }
   )
